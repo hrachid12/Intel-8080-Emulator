@@ -9,9 +9,7 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="8e8538e4-7cc1-46b6-8acc-c0ec420cc7b2" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/disassembler/disassembler.c" beforeDir="false" afterPath="$PROJECT_DIR$/disassembler/disassembler.c" afterDir="false" />
-    </list>
+    <list default="true" id="8e8538e4-7cc1-46b6-8acc-c0ec420cc7b2" name="Default Changelist" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -46,7 +44,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1633971577186</updated>
-      <workItem from="1633971578762" duration="407000" />
+      <workItem from="1633971578762" duration="734000" />
     </task>
     <servers />
   </component>
