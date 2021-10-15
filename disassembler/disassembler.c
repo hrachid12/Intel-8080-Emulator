@@ -1,10 +1,4 @@
 
-/* CS 467 project for emulating Intel 8080 and playing Space Invaders ROM */
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdint.h>
-
 int Disassembler(unsigned char *buffer, int pc) {
     unsigned char *code = &buffer[pc];
     int opbytes = 1;
@@ -14,7 +8,7 @@ int Disassembler(unsigned char *buffer, int pc) {
     Used http://www.emulator101.com/8080-by-opcode.html as a reference. */
     switch (*code) {
         case 0x00: printf("NOP"); break;
-        case 0x01: printf("LXI B, $%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x01: printf("LXI B, #$%02x%02x", code[2], code[1]); opbytes = 3; break;
         case 0x02: printf("STAX    B"); break;
         case 0x03: printf("INX    B"); break;
         case 0x04: printf("INR    B"); break;
@@ -30,7 +24,7 @@ int Disassembler(unsigned char *buffer, int pc) {
         case 0x0e: printf("MVI    C, #%02x", code[1]); opbytes = 2; break;
         case 0x0f: printf("RRC"); break;
         case 0x10: printf("NOP"); break;
-        case 0x11: printf("LXI    D, $%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x11: printf("LXI    D, #$%02x%02x", code[2], code[1]); opbytes = 3; break;
         case 0x12: printf("STAX   D"); break;
         case 0x13: printf("INX    D"); break;
         case 0x14: printf("INR    D"); break;
@@ -43,39 +37,39 @@ int Disassembler(unsigned char *buffer, int pc) {
         case 0x1b: printf("DCX    D"); break;
         case 0x1c: printf("INR    E"); break;
         case 0x1d: printf("DCR    E"); break;
-        case 0x1e: printf("MVI    E, $%02x", code[1]); opbytes = 2; break;
+        case 0x1e: printf("MVI    E, #$%02x", code[1]); opbytes = 2; break;
         case 0x1f: printf("RAR"); break;
         case 0x20: printf("NOP"); break;
-        case 0x21: printf("LXI    H, $%02x%02x", code[2], code[1]); opbytes = 3; break;
-        case 0x22: printf("SHLD   , $%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x21: printf("LXI    H, #$%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x22: printf("SHLD   , #$%02x%02x", code[2], code[1]); opbytes = 3; break;
         case 0x23: printf("INX    H"); break;
         case 0x24: printf("INR    H"); break;
         case 0x25: printf("DCR    H"); break;
-        case 0x26: printf("MVI    H, $%02x", code[1]); opbytes = 2; break;
+        case 0x26: printf("MVI    H, #$%02x", code[1]); opbytes = 2; break;
         case 0x27: printf("DAA"); break;
         case 0x28: printf("NOP"); break;
         case 0x29: printf("DAD    H"); break;
-        case 0x2a: printf("LHLD   , $%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x2a: printf("LHLD   , #$%02x%02x", code[2], code[1]); opbytes = 3; break;
         case 0x2b: printf("DCX    H"); break;
         case 0x2c: printf("INR    L"); break;
         case 0x2d: printf("DCR    L"); break;
-        case 0x2e: printf("MVI    L, $%02x", code[1]); opbytes = 2; break;
+        case 0x2e: printf("MVI    L, #$%02x", code[1]); opbytes = 2; break;
         case 0x2f: printf("CMA"); break;	
         case 0x30: printf("NOP"); break;
-        case 0x31: printf("LXI    SP, $%02x%02x", code[2], code[1]); opbytes = 3; break;
-        case 0x32: printf("STA    , $%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x31: printf("LXI    SP, #$%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x32: printf("STA    , #$%02x%02x", code[2], code[1]); opbytes = 3; break;
         case 0x33: printf("INX    SP"); break;
         case 0x34: printf("INR    M"); break;
         case 0x35: printf("DCR    M"); break;
-        case 0x36: printf("MVI    M, $%02x", code[1]); opbytes = 2; break;
+        case 0x36: printf("MVI    M, #$%02x", code[1]); opbytes = 2; break;
         case 0x37: printf("STC"); break;
         case 0x38: printf("NOP"); break;
         case 0x39: printf("DAD    SP"); break;
-        case 0x3a: printf("LDA    , $%02x%02x", code[2], code[1]); opbytes = 3; break;
+        case 0x3a: printf("LDA    , #$%02x%02x", code[2], code[1]); opbytes = 3; break;
         case 0x3b: printf("DCX    SP"); break;
         case 0x3c: printf("INR    A"); break;
         case 0x3d: printf("DCR    A"); break;
-        case 0x3e: printf("MVI    A, $%02x", code[1]); opbytes = 2; break;
+        case 0x3e: printf("MVI    A, #$%02x", code[1]); opbytes = 2; break;
         case 0x3f: printf("CMC"); break;
         case 0x40: printf("MOV    B, B"); break;
         case 0x41: printf("MOV    B, C"); break;
@@ -190,88 +184,6 @@ int Disassembler(unsigned char *buffer, int pc) {
         case 0xad: printf("XRA     L"); break;
         case 0xae: printf("XRA     M"); break;
         case 0xaf: printf("XRA     A"); break;
-
-        case 0xb0: printf("ORA    B"); break;       // ORA - Logically OR A with specified Register
-        case 0xb1: printf("ORA    C"); break;       // A <- A | C
-        case 0xb2: printf("ORA    D"); break;
-        case 0xb3: printf("ORA    E"); break;
-        case 0xb4: printf("ORA    H"); break;
-        case 0xb5: printf("ORA    L"); break;
-        case 0xb6: printf("ORA    M"); break;
-        case 0xb7: printf("ORA    A"); break;
-        case 0xb8: printf("CMP    B"); break;       // CMP - Compares REG with A, setting flags to indicate the result
-        case 0xb9: printf("CMP    C"); break;       // A > REG - Zero and Carry bits reset
-        case 0xba: printf("CMP    D"); break;       // A < REG - Zero reset, carry set
-        case 0xbb: printf("CMP    E"); break;
-        case 0xbc: printf("CMP    H"); break;
-        case 0xbd: printf("CMP    L"); break;
-        case 0xbe: printf("CMP    M"); break;
-        case 0xbf: printf("CMP    A"); break;
-        case 0xc0: printf("RNZ"); break;
-        case 0xc1: printf("POP    B"); break;
-        case 0xc2: printf("JNZ    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xc3: printf("JMP    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xc4: printf("CNZ    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xc5: printf("PUSH   B"); break;
-        case 0xc6: printf("ADI    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xc7: printf("RST    0"); break;
-        case 0xc8: printf("RZ"); break;
-        case 0xc9: printf("RET"); break;
-        case 0xca: printf("JZ     adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xcb: printf("NOP"); break;
-        case 0xcc: printf("CZ     adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xcd: printf("CALL   adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xce: printf("ACI    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xcf: printf("RST    1"); break;
-        case 0xd0: printf("RNC"); break;
-        case 0xd1: printf("POP    D"); break;
-        case 0xd2: printf("JNC    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xd3: printf("OUT    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xd4: printf("CNC    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xd5: printf("PUSH   D"); break;
-        case 0xd6: printf("SUI    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xd7: printf("RST    2"); break;
-        case 0xd8: printf("RC"); break;
-        case 0xd9: printf("NOP"); break;
-        case 0xda: printf("JC    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xdb: printf("IN    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xdc: printf("CC    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xdd: printf("NOP"); break;
-        case 0xde: printf("SBI    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xdf: printf("RST    3"); break;
-        case 0xe0: printf("RPO"); break;
-        case 0xe1: printf("POP    H"); break;
-        case 0xe2: printf("JPO    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xe3: printf("XTHL"); break;
-        case 0xe4: printf("CPO    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xe5: printf("PUSH    H"); break;
-        case 0xe6: printf("ANI    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xe7: printf("RST    4"); break;
-        case 0xe8: printf("RPE"); break;
-        case 0xe9: printf("PCHL"); break;
-        case 0xea: printf("JPE    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xeb: printf("XCHG"); break;
-        case 0xec: printf("CPE    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xed: printf("NOP"); break;
-        case 0xee: printf("XRI    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xef: printf("RST    5"); break;
-        case 0xf0: printf("RP"); break;
-        case 0xf1: printf("POP    PSW"); break;
-        case 0xf2: printf("JP    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xf3: printf("DI"); break;
-        case 0xf4: printf("CP    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xf5: printf("PUSH    PSW"); break;
-        case 0xf6: printf("ORI    D8, #$%02x", code[1]); opbytes = 2; break;
-        case 0xf7: printf("RST    6"); break;
-        case 0xf8: printf("RM"); break;
-        case 0xf9: printf("SPHL"); break;
-        case 0xfa: printf("JM    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xfb: printf("EI"); break;
-        case 0xfc: printf("CM    adr, #$%02x$02x", code[2], code[1]); opbytes = 3; break;
-        case 0xfd: printf("NOP"); break;
-        case 0xfe: printf("CPI    D8, #$%02x"); opbytes = 2; break;
-        case 0xff: printf("RST    7"); break;
-
     }
 
     printf("\n");
