@@ -263,7 +263,7 @@ int Disassembler(unsigned char *buffer, int pc) {
         case 0xfb: printf("EI"); break;
         case 0xfc: printf("CM      $%02x%02x", code[2], code[1]); opbytes = 3; break;
         case 0xfd: printf("NOP"); break;
-        case 0xfe: printf("CPI     D8, #$%02x", code[1]); opbytes = 2; break;
+        case 0xfe: printf("CPI     #$%02x", code[1]); opbytes = 2; break;
         case 0xff: printf("RST     7"); break;
     }
 
