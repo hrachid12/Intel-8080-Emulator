@@ -1,3 +1,7 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 int Disassembler(unsigned char *buffer, int pc) {
     unsigned char *code = &buffer[pc];
