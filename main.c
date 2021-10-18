@@ -44,7 +44,7 @@ int main (int argc, char**argv)
 	
 	while (done == 0)
 	{
-		done = Emulate8080Op(state);
+		done = Emulate8080(state);
 	}
 	return 0;
 }
