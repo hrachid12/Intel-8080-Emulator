@@ -29,7 +29,7 @@ int main (int argc, char**argv)
 
     while (pc < fsize)                  // loop through buffer and disassemble one instruction at a time    
     {    
-        pc += Disassembler(buffer, pc); // increment pc by the number of bytes used by the instruction
+        pc += Disassemble8080(buffer, pc); // increment pc by the number of bytes used by the instruction
     }    
     return 0;    
    } 
