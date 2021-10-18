@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "./disassembler/disassembler.c"
-#include "./emulator/emulator.c"
+#include "./disassembler/disassembler.h"
+#include "./emulator/emulator.h"
 
 void ReadFileIntoMemoryAt(State8080* state, char* filename, uint32_t offset)
 {

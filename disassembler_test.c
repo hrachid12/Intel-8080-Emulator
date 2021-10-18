@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "./disassembler/disassembler.c"
+#include "./disassembler/disassembler.h"
 
 int main (int argc, char**argv)    
    {    
