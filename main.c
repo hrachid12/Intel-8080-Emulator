@@ -354,10 +354,10 @@ int main (int argc, char**argv)
 	int vblankcycles = 0;
 	State8080* state = Init8080();
 	
-	ReadFileIntoMemoryAt(state, "invaders.h", 0);
-	ReadFileIntoMemoryAt(state, "invaders.g", 0x800);
-	ReadFileIntoMemoryAt(state, "invaders.f", 0x1000);
-	ReadFileIntoMemoryAt(state, "invaders.e", 0x1800);
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.h", 0);
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.g", 0x800);
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.f", 0x1000);
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.e", 0x1800);
 	
 	while (done == 0)
 	{
