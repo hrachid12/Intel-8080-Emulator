@@ -4,33 +4,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "./disassembler/disassembler.h"
-
-typedef struct ConditionCodes {
-	uint8_t		z:1;
-	uint8_t		s:1;
-	uint8_t		p:1;
-	uint8_t		cy:1;
-	uint8_t		ac:1;
-	uint8_t		pad:3;
-} ConditionCodes;
-
-ConditionCodes CC_ZSPAC = {1,1,1,0,1};
-
-typedef struct State8080 {
-	uint8_t		a;
-	uint8_t		b;
-	uint8_t		c;
-	uint8_t		d;
-	uint8_t		e;
-	uint8_t		h;
-	uint8_t		l;
-	uint16_t	sp;
-	uint16_t	pc;
-	uint8_t		*memory;
-	struct ConditionCodes		cc;
-	uint8_t		int_enable;
-} State8080;
+#include "./disassembler/disassembler.c"
+#include "./emulator/emulator.c"
 
 void ReadFileIntoMemoryAt(State8080* state, char* filename, uint32_t offset)
 {
@@ -61,11 +36,11 @@ int main (int argc, char**argv)
 	int done = 0;
 	int vblankcycles = 0;
 	State8080* state = Init8080();
-	
-	ReadFileIntoMemoryAt(state, "invaders.h", 0);
-	ReadFileIntoMemoryAt(state, "invaders.g", 0x800);
-	ReadFileIntoMemoryAt(state, "invaders.f", 0x1000);
-	ReadFileIntoMemoryAt(state, "invaders.e", 0x1800);
+
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.h", 0);
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.g", 0x800);
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.f", 0x1000);
+	ReadFileIntoMemoryAt(state, "./ROMs/invaders.e", 0x1800);
 	
 	while (done == 0)
 	{
