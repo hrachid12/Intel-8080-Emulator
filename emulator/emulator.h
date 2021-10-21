@@ -263,7 +263,17 @@ int Emulate8080(State8080* state)
         case 0xc6: UnimplementedInstruction(state); break;		//  ADI     8bit_data
         case 0xc7: UnimplementedInstruction(state); break;		//  RST     0
         case 0xc8: UnimplementedInstruction(state); break;		//  RZ
-        case 0xc9: UnimplementedInstruction(state); break;		//  RET
+        case 0xc9:
+            // RET
+
+            // Set pc to the 16bit address taken from the stack
+            // Left shift the upper byte and use inclusive OR to create the
+            // 16bit address
+            state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+
+            // Increment stack pointer
+            state->sp += 2;
+            break;
         case 0xca:
             //  JZ address
             if (1 == state->cc.z) {
@@ -275,8 +285,48 @@ int Emulate8080(State8080* state)
             }
             break;
         case 0xcb: UnimplementedInstruction(state); break;		//  NOP
-        case 0xcc: UnimplementedInstruction(state); break;		//  CZ      address
-        case 0xcd: UnimplementedInstruction(state); break;		//  CALL    address
+        case 0xcc:
+            // CZ addr
+
+            if (1 == state->cc.z) {
+                uint16_t ret = state->pc+2;
+
+                //Save upper byte
+                state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+                // Save lower byte
+                state->memory[state->sp-2] = (ret & 0xff);
+
+                // Update stack pointer
+                state->sp = state->sp - 2;
+
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                // Set pc to the target 16bit address
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2
+            }
+            break;
+        case 0xcd:
+        case 0xcd:
+            //CALL address
+            uint16_t ret = state->pc+2;
+
+            //Save upper byte
+            state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+            // Save lower byte
+            state->memory[state->sp-2] = (ret & 0xff);
+
+            // Update stack pointer
+            state->sp = state->sp - 2;
+
+            // Create 16bit address from the opcodes
+            // Leftshift larger byte due to format being little endian
+            // Set pc to the target 16bit address
+            state->pc = (opcode[2] << 8) | opcode[1];
+            break;
         case 0xce: UnimplementedInstruction(state); break;		//  ACI     8bit_data
         case 0xcf: UnimplementedInstruction(state); break;		//  RST     1
         case 0xd0: UnimplementedInstruction(state); break;		//  RNC
