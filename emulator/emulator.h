@@ -40,6 +40,8 @@ void UnimplementedInstruction(State8080* state)
 	exit(1);
 }
 
+
+
 int Emulate8080(State8080* state)
 {
 	unsigned char *code = &state->memory[state->pc];
@@ -245,7 +247,16 @@ int Emulate8080(State8080* state)
         case 0xbf: UnimplementedInstruction(state); break;		//  CMP     A
         case 0xc0: UnimplementedInstruction(state); break;		//  RNZ
         case 0xc1: UnimplementedInstruction(state); break;		//  POP     B
-        case 0xc2: UnimplementedInstruction(state); break;		//  JNZ     address
+        case 0xc2:
+            //  JNZ address
+            if (0 == state->cc.z) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xc3: UnimplementedInstruction(state); break;		//  JMP     address
         case 0xc4: UnimplementedInstruction(state); break;		//  CNZ     address
         case 0xc5: UnimplementedInstruction(state); break;		//  PUSH    B
@@ -253,7 +264,16 @@ int Emulate8080(State8080* state)
         case 0xc7: UnimplementedInstruction(state); break;		//  RST     0
         case 0xc8: UnimplementedInstruction(state); break;		//  RZ
         case 0xc9: UnimplementedInstruction(state); break;		//  RET
-        case 0xca: UnimplementedInstruction(state); break;		//  JZ      address
+        case 0xca:
+            //  JZ address
+            if (1 == state->cc.z) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xcb: UnimplementedInstruction(state); break;		//  NOP
         case 0xcc: UnimplementedInstruction(state); break;		//  CZ      address
         case 0xcd: UnimplementedInstruction(state); break;		//  CALL    address
@@ -261,7 +281,16 @@ int Emulate8080(State8080* state)
         case 0xcf: UnimplementedInstruction(state); break;		//  RST     1
         case 0xd0: UnimplementedInstruction(state); break;		//  RNC
         case 0xd1: UnimplementedInstruction(state); break;		//  POP     D
-        case 0xd2: UnimplementedInstruction(state); break;		//  JNC     address
+        case 0xd2:
+            //  JNC address
+            if (0 == state->cc.cy) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xd3: UnimplementedInstruction(state); break;		//  OUT     output_device_num
         case 0xd4: UnimplementedInstruction(state); break;		//  CNC     address
         case 0xd5: UnimplementedInstruction(state); break;		//  PUSH    D
@@ -269,7 +298,16 @@ int Emulate8080(State8080* state)
         case 0xd7: UnimplementedInstruction(state); break;		//  RST     2
         case 0xd8: UnimplementedInstruction(state); break;		//  RC
         case 0xd9: UnimplementedInstruction(state); break;		//  NOP
-        case 0xda: UnimplementedInstruction(state); break;		//  JC      address
+        case 0xda:
+            //  JC address
+            if (1 == state->cc.cy) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xdb: UnimplementedInstruction(state); break;		//  IN      input_device_num
         case 0xdc: UnimplementedInstruction(state); break;		//  CC      address
         case 0xdd: UnimplementedInstruction(state); break;		//  NOP
@@ -277,7 +315,16 @@ int Emulate8080(State8080* state)
         case 0xdf: UnimplementedInstruction(state); break;		//  RST     3
         case 0xe0: UnimplementedInstruction(state); break;		//  RPO
         case 0xe1: UnimplementedInstruction(state); break;		//  POP     H
-        case 0xe2: UnimplementedInstruction(state); break;		//  JPO     address
+        case 0xe2:
+            //  JPO address
+            if (0 == state->cc.p) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2
+            }
+            break;
         case 0xe3: UnimplementedInstruction(state); break;		//  XTHL
         case 0xe4: UnimplementedInstruction(state); break;		//  CPO     address
         case 0xe5: UnimplementedInstruction(state); break;		//  PUSH    H
@@ -285,7 +332,16 @@ int Emulate8080(State8080* state)
         case 0xe7: UnimplementedInstruction(state); break;		//  RST     4
         case 0xe8: UnimplementedInstruction(state); break;		//  RPE
         case 0xe9: UnimplementedInstruction(state); break;		//  PCHL
-        case 0xea: UnimplementedInstruction(state); break;		//  JPE     address
+        case 0xea:
+            // JPE address
+            if (1 == state->cc.p) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xeb: UnimplementedInstruction(state); break;		//  XCHG
         case 0xec: UnimplementedInstruction(state); break;		//  CPE     address
         case 0xed: UnimplementedInstruction(state); break;		//  NOP
@@ -293,7 +349,16 @@ int Emulate8080(State8080* state)
         case 0xef: UnimplementedInstruction(state); break;		//  RST     5
         case 0xf0: UnimplementedInstruction(state); break;		//  RP
         case 0xf1: UnimplementedInstruction(state); break;		//  POP     PSW
-        case 0xf2: UnimplementedInstruction(state); break;		//  JP      address
+        case 0xf2:
+            //  JP address
+            if (0 == state->cc.s) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xf3: UnimplementedInstruction(state); break;		//  DI
         case 0xf4: UnimplementedInstruction(state); break;		//  CP      address
         case 0xf5: UnimplementedInstruction(state); break;		//  PUSH    PSW
@@ -301,7 +366,16 @@ int Emulate8080(State8080* state)
         case 0xf7: UnimplementedInstruction(state); break;		//  RST     6
         case 0xf8: UnimplementedInstruction(state); break;		//  RM
         case 0xf9: UnimplementedInstruction(state); break;		//  SPHL
-        case 0xfa: UnimplementedInstruction(state); break;		//  JM      address
+        case 0xfa:
+            //  JM address
+            if (1 == state->cc.s) {
+                // Create 16bit address from the opcodes
+                // Leftshift larger byte due to format being little endian
+                state->pc = (opcode[2] << 8) | opcode[1];
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xfb: UnimplementedInstruction(state); break;		//  EI
         case 0xfc: UnimplementedInstruction(state); break;		//  CM      address
         case 0xfd: UnimplementedInstruction(state); break;		//  NOP
