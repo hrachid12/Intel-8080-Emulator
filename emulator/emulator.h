@@ -251,13 +251,20 @@ int Emulate8080(State8080* state)
             //  JNZ address
             if (0 == state->cc.z) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2;
             }
             break;
-        case 0xc3: UnimplementedInstruction(state); break;		//  JMP     address
+        case 0xc3:
+            //  JMP     address
+            // Create 16bit address from the opcodes
+            // Left shift larger byte due to format being little endian
+            // Jump to the 16bit address
+            state->pc = (opcode[2] << 8) | opcode[1];
+            break;
         case 0xc4: UnimplementedInstruction(state); break;		//  CNZ     address
         case 0xc5: UnimplementedInstruction(state); break;		//  PUSH    B
         case 0xc6: UnimplementedInstruction(state); break;		//  ADI     8bit_data
@@ -268,7 +275,8 @@ int Emulate8080(State8080* state)
             //  JZ address
             if (1 == state->cc.z) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2;
@@ -285,7 +293,8 @@ int Emulate8080(State8080* state)
             //  JNC address
             if (0 == state->cc.cy) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2;
@@ -302,7 +311,8 @@ int Emulate8080(State8080* state)
             //  JC address
             if (1 == state->cc.cy) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2;
@@ -319,7 +329,8 @@ int Emulate8080(State8080* state)
             //  JPO address
             if (0 == state->cc.p) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2
@@ -336,7 +347,8 @@ int Emulate8080(State8080* state)
             // JPE address
             if (1 == state->cc.p) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2;
@@ -353,7 +365,8 @@ int Emulate8080(State8080* state)
             //  JP address
             if (0 == state->cc.s) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2;
@@ -370,7 +383,8 @@ int Emulate8080(State8080* state)
             //  JM address
             if (1 == state->cc.s) {
                 // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
+                // Left shift larger byte due to format being little endian
+                // Jump to the 16bit address
                 state->pc = (opcode[2] << 8) | opcode[1];
             } else {
                 state->pc += 2;
