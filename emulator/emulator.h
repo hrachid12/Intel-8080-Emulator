@@ -67,7 +67,7 @@ void CALL (State8080* state, char *code) {
 }
 
 
-void RET(State8080 state) {
+void RET(State8080* state) {
     // Set pc to the 16bit address taken from the stack
     // Left shift the upper byte and use inclusive OR to create the
     // 16bit address
