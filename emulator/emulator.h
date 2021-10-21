@@ -41,6 +41,42 @@ void UnimplementedInstruction(State8080* state)
 }
 
 
+void JMP (State8080* state, char *code) {
+    // Create 16bit address from the opcodes
+    // Left shift larger byte due to format being little endian
+    // Jump to the 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+void CALL (State8080* state, char *code) {
+    uint16_t ret = state->pc+2;
+
+    //Save upper byte
+    state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+    // Save lower byte
+    state->memory[state->sp-2] = (ret & 0xff);
+
+    // Update stack pointer
+    state->sp = state->sp - 2;
+
+    // Create 16bit address from the codes
+    // Leftshift larger byte due to format being little endian
+    // Set pc to the target 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+
+void RET(State8080 state) {
+    // Set pc to the 16bit address taken from the stack
+    // Left shift the upper byte and use inclusive OR to create the
+    // 16bit address
+    state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+
+    // Increment stack pointer
+    state->sp += 2;
+}
+
 
 int Emulate8080(State8080* state)
 {
@@ -250,20 +286,14 @@ int Emulate8080(State8080* state)
         case 0xc2:
             //  JNZ address
             if (0 == state->cc.z) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xc3:
-            //  JMP     address
-            // Create 16bit address from the codes
-            // Left shift larger byte due to format being little endian
-            // Jump to the 16bit address
-            state->pc = (code[2] << 8) | code[1];
+            //  JMP address
+            JMP(state, code);
             break;
         case 0xc4: UnimplementedInstruction(state); break;		//  CNZ     address
         case 0xc5: UnimplementedInstruction(state); break;		//  PUSH    B
@@ -272,22 +302,12 @@ int Emulate8080(State8080* state)
         case 0xc8: UnimplementedInstruction(state); break;		//  RZ
         case 0xc9:
             // RET
-
-            // Set pc to the 16bit address taken from the stack
-            // Left shift the upper byte and use inclusive OR to create the
-            // 16bit address
-            state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
-
-            // Increment stack pointer
-            state->sp += 2;
+            RET(state);
             break;
         case 0xca:
             //  JZ address
             if (1 == state->cc.z) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
@@ -297,21 +317,7 @@ int Emulate8080(State8080* state)
             // CZ addr
 
             if (1 == state->cc.z) {
-                uint16_t ret = state->pc+2;
-
-                //Save upper byte
-                state->memory[state->sp-1] = (ret >> 8) & 0xff;
-
-                // Save lower byte
-                state->memory[state->sp-2] = (ret & 0xff);
-
-                // Update stack pointer
-                state->sp = state->sp - 2;
-
-                // Create 16bit address from the codes
-                // Leftshift larger byte due to format being little endian
-                // Set pc to the target 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                CALL(state, code);
             } else {
                 state->pc += 2
             }
@@ -319,21 +325,7 @@ int Emulate8080(State8080* state)
         case 0xcd:
         case 0xcd:
             //CALL address
-            uint16_t ret = state->pc+2;
-
-            //Save upper byte
-            state->memory[state->sp-1] = (ret >> 8) & 0xff;
-
-            // Save lower byte
-            state->memory[state->sp-2] = (ret & 0xff);
-
-            // Update stack pointer
-            state->sp = state->sp - 2;
-
-            // Create 16bit address from the codes
-            // Leftshift larger byte due to format being little endian
-            // Set pc to the target 16bit address
-            state->pc = (code[2] << 8) | code[1];
+            CALL(state, code);
             break;
         case 0xce: UnimplementedInstruction(state); break;		//  ACI     8bit_data
         case 0xcf: UnimplementedInstruction(state); break;		//  RST     1
@@ -342,10 +334,7 @@ int Emulate8080(State8080* state)
         case 0xd2:
             //  JNC address
             if (0 == state->cc.cy) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
@@ -360,10 +349,7 @@ int Emulate8080(State8080* state)
         case 0xda:
             //  JC address
             if (1 == state->cc.cy) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
@@ -378,10 +364,7 @@ int Emulate8080(State8080* state)
         case 0xe2:
             //  JPO address
             if (0 == state->cc.p) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2
             }
@@ -396,10 +379,7 @@ int Emulate8080(State8080* state)
         case 0xea:
             // JPE address
             if (1 == state->cc.p) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
@@ -414,10 +394,7 @@ int Emulate8080(State8080* state)
         case 0xf2:
             //  JP address
             if (0 == state->cc.s) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
@@ -432,10 +409,7 @@ int Emulate8080(State8080* state)
         case 0xfa:
             //  JM address
             if (1 == state->cc.s) {
-                // Create 16bit address from the codes
-                // Left shift larger byte due to format being little endian
-                // Jump to the 16bit address
-                state->pc = (code[2] << 8) | code[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
