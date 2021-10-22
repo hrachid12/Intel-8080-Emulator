@@ -366,7 +366,6 @@ int Emulate8080(State8080* state)
             }
             break;
         case 0xcd:
-        case 0xcd:
             //CALL address
             CALL(state, code);
             break;
