@@ -41,6 +41,61 @@ void UnimplementedInstruction(State8080* state)
 }
 
 
+void JMP (State8080* state, char *code) {
+    // Create 16bit address from the opcodes
+    // Left shift larger byte due to format being little endian
+    // Jump to the 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+void CALL (State8080* state, char *code) {
+    uint16_t ret = state->pc+2;
+
+    //Save upper byte
+    state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+    // Save lower byte
+    state->memory[state->sp-2] = (ret & 0xff);
+
+    // Update stack pointer
+    state->sp = state->sp - 2;
+
+    // Create 16bit address from the codes
+    // Leftshift larger byte due to format being little endian
+    // Set pc to the target 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+void RST (State8080* state, char* num) {
+    uint16_t ret = state->pc+2;
+
+    //Save upper byte
+    state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+    // Save lower byte
+    state->memory[state->sp-2] = (ret & 0xff);
+
+    // Update stack pointer
+    state->sp = state->sp - 2;
+
+    // Create 16bit address from the number provided
+    // Leftshift number by three to match the required placement
+    // as per the Intel 8080 programming manual (page 37)
+    // Set pc to the target 16bit address
+    state->pc = (num << 3) | 0x0000;
+}
+
+
+void RET(State8080* state) {
+    // Set pc to the 16bit address taken from the stack
+    // Left shift the upper byte and use inclusive OR to create the
+    // 16bit address
+    state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+
+    // Increment stack pointer
+    state->sp += 2;
+}
+
 
 int Emulate8080(State8080* state)
 {
@@ -51,7 +106,7 @@ int Emulate8080(State8080* state)
 	state->pc += 1;													// inc pc by 1
 
 	switch(*code) {
-				case 0x00: UnimplementedInstruction(state); break;		//	NOP
+	    case 0x00: UnimplementedInstruction(state); break;		//	NOP
         case 0x01: UnimplementedInstruction(state); break;		//  LXI     B, 16bit_data
         case 0x02: UnimplementedInstruction(state); break;		//	STAX    B
         case 0x03: UnimplementedInstruction(state); break;		//	INX     B
@@ -245,142 +300,272 @@ int Emulate8080(State8080* state)
         case 0xbd: UnimplementedInstruction(state); break;		//  CMP     L
         case 0xbe: UnimplementedInstruction(state); break;		//  CMP     M
         case 0xbf: UnimplementedInstruction(state); break;		//  CMP     A
-        case 0xc0: UnimplementedInstruction(state); break;		//  RNZ
-        case 0xc1: UnimplementedInstruction(state); break;		//  POP     B
-        case 0xc2:
-            //  JNZ address
+        case 0xc0:
+            //  RNZ
             if (0 == state->cc.z) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                RET(state);
             } else {
                 state->pc += 2;
             }
             break;
-        case 0xc3: UnimplementedInstruction(state); break;		//  JMP     address
-        case 0xc4: UnimplementedInstruction(state); break;		//  CNZ     address
+        case 0xc1: UnimplementedInstruction(state); break;		//  POP     B
+        case 0xc2:
+            //  JNZ address
+            if (0 == state->cc.z) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc3:
+            //  JMP address
+            JMP(state, code);
+            break;
+        case 0xc4:
+            // CNZ addr
+            if (0 == state->cc.z) {
+                CALL(state, code);
+            } else {
+                state->pc += 2
+            }
+            break;
         case 0xc5: UnimplementedInstruction(state); break;		//  PUSH    B
         case 0xc6: UnimplementedInstruction(state); break;		//  ADI     8bit_data
-        case 0xc7: UnimplementedInstruction(state); break;		//  RST     0
-        case 0xc8: UnimplementedInstruction(state); break;		//  RZ
-        case 0xc9: UnimplementedInstruction(state); break;		//  RET
+        case 0xc7:
+            //  RST     0
+            RST(state, 0)
+            break;
+        case 0xc8:
+            // RZ
+            if (1 == state->cc.z) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc9:
+            // RET
+            RET(state);
+            break;
         case 0xca:
             //  JZ address
             if (1 == state->cc.z) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xcb: UnimplementedInstruction(state); break;		//  NOP
-        case 0xcc: UnimplementedInstruction(state); break;		//  CZ      address
-        case 0xcd: UnimplementedInstruction(state); break;		//  CALL    address
+        case 0xcc:
+            // CZ addr
+
+            if (1 == state->cc.z) {
+                CALL(state, code);
+            } else {
+                state->pc += 2
+            }
+            break;
+        case 0xcd:
+            //CALL address
+            CALL(state, code);
+            break;
         case 0xce: UnimplementedInstruction(state); break;		//  ACI     8bit_data
-        case 0xcf: UnimplementedInstruction(state); break;		//  RST     1
-        case 0xd0: UnimplementedInstruction(state); break;		//  RNC
+        case 0xcf:
+            //  RST     1
+            RST(state, 1)
+            break;
+        case 0xd0:
+            //  RNC
+            if (0 == state->cc.cy) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xd1: UnimplementedInstruction(state); break;		//  POP     D
         case 0xd2:
             //  JNC address
             if (0 == state->cc.cy) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xd3: UnimplementedInstruction(state); break;		//  OUT     output_device_num
-        case 0xd4: UnimplementedInstruction(state); break;		//  CNC     address
+        case 0xd4:
+            //  CNC address
+            if (0 == state->cc.cy) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xd5: UnimplementedInstruction(state); break;		//  PUSH    D
         case 0xd6: UnimplementedInstruction(state); break;		//  SUI     8bit_data
-        case 0xd7: UnimplementedInstruction(state); break;		//  RST     2
-        case 0xd8: UnimplementedInstruction(state); break;		//  RC
+        case 0xd7:
+            //  RST     2
+            RST(state, 2)
+            break;
+        case 0xd8:
+            //  RC
+            if (1 == state->cc.cy) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xd9: UnimplementedInstruction(state); break;		//  NOP
         case 0xda:
             //  JC address
             if (1 == state->cc.cy) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xdb: UnimplementedInstruction(state); break;		//  IN      input_device_num
-        case 0xdc: UnimplementedInstruction(state); break;		//  CC      address
+        case 0xdc:
+            //  CC address
+            if (1 == state->cc.cy) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xdd: UnimplementedInstruction(state); break;		//  NOP
         case 0xde: UnimplementedInstruction(state); break;		//  SBI     8bit_data
-        case 0xdf: UnimplementedInstruction(state); break;		//  RST     3
-        case 0xe0: UnimplementedInstruction(state); break;		//  RPO
+        case 0xdf:
+            //  RST     3
+            RST(state, 3)
+            break;
+        case 0xe0:
+            //  RPO
+            if (0 == state->cc.p) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xe1: UnimplementedInstruction(state); break;		//  POP     H
         case 0xe2:
             //  JPO address
             if (0 == state->cc.p) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2
             }
             break;
         case 0xe3: UnimplementedInstruction(state); break;		//  XTHL
-        case 0xe4: UnimplementedInstruction(state); break;		//  CPO     address
+        case 0xe4:
+            //  CPO     address
+            if (0 == state->cc.p) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xe5: UnimplementedInstruction(state); break;		//  PUSH    H
         case 0xe6: UnimplementedInstruction(state); break;		//  ANI     8bit_data
-        case 0xe7: UnimplementedInstruction(state); break;		//  RST     4
-        case 0xe8: UnimplementedInstruction(state); break;		//  RPE
+        case 0xe7:
+            //  RST     4
+            RST(state, 4)
+            break;
+        case 0xe8:
+            //  RPE
+            if (1 == state->cc.p) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xe9: UnimplementedInstruction(state); break;		//  PCHL
         case 0xea:
             // JPE address
             if (1 == state->cc.p) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xeb: UnimplementedInstruction(state); break;		//  XCHG
-        case 0xec: UnimplementedInstruction(state); break;		//  CPE     address
+        case 0xec:
+            //  CPE     address
+            if (1 == state->cc.p) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xed: UnimplementedInstruction(state); break;		//  NOP
         case 0xee: UnimplementedInstruction(state); break;		//  XRI     8bit_data
-        case 0xef: UnimplementedInstruction(state); break;		//  RST     5
-        case 0xf0: UnimplementedInstruction(state); break;		//  RP
+        case 0xef:
+            //  RST     5
+            RST(state, 5)
+            break;
+        case 0xf0:
+            //  RP
+            if (0 == state->cc.s) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xf1: UnimplementedInstruction(state); break;		//  POP     PSW
         case 0xf2:
             //  JP address
             if (0 == state->cc.s) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xf3: UnimplementedInstruction(state); break;		//  DI
-        case 0xf4: UnimplementedInstruction(state); break;		//  CP      address
+        case 0xf4:
+            //  CP      address
+            if (0 == state->cc.s) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xf5: UnimplementedInstruction(state); break;		//  PUSH    PSW
         case 0xf6: UnimplementedInstruction(state); break;		//  ORI     8bit_data
-        case 0xf7: UnimplementedInstruction(state); break;		//  RST     6
-        case 0xf8: UnimplementedInstruction(state); break;		//  RM
+        case 0xf7:
+            //  RST     6
+            RST(state, 6)
+            break;
+        case 0xf8:
+            //  RM
+            if (1 == state->cc.s) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xf9: UnimplementedInstruction(state); break;		//  SPHL
         case 0xfa:
             //  JM address
             if (1 == state->cc.s) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xfb: UnimplementedInstruction(state); break;		//  EI
-        case 0xfc: UnimplementedInstruction(state); break;		//  CM      address
+        case 0xfc:
+            //  CM      address
+            if (1 == state->cc.s) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xfd: UnimplementedInstruction(state); break;		//  NOP
         case 0xfe: UnimplementedInstruction(state); break;		//  CPI     8bit_data
-        case 0xff: UnimplementedInstruction(state); break;		//  RST     7
+        case 0xff:
+            //  RST     7
+            RST(state, 7)
+            break;
 	}
 	// Print out flag condition codes and address data here to keep track of them after each instruction for debugging
 	/*
