@@ -40,6 +40,62 @@ void UnimplementedInstruction(State8080* state)
 	exit(1);
 }
 
+void JMP (State8080* state, char *code) {
+    // Create 16bit address from the opcodes
+    // Left shift larger byte due to format being little endian
+    // Jump to the 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+void CALL (State8080* state, char *code) {
+    uint16_t ret = state->pc+2;
+
+    //Save upper byte
+    state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+    // Save lower byte
+    state->memory[state->sp-2] = (ret & 0xff);
+
+    // Update stack pointer
+    state->sp = state->sp - 2;
+
+    // Create 16bit address from the codes
+    // Leftshift larger byte due to format being little endian
+    // Set pc to the target 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+void RST (State8080* state, char* num) {
+    uint16_t ret = state->pc+2;
+
+    //Save upper byte
+    state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+    // Save lower byte
+    state->memory[state->sp-2] = (ret & 0xff);
+
+    // Update stack pointer
+    state->sp = state->sp - 2;
+
+    // Create 16bit address from the number provided
+    // Leftshift number by three to match the required placement
+    // as per the Intel 8080 programming manual (page 37)
+    // Set pc to the target 16bit address
+    state->pc = (num << 3) | 0x0000;
+}
+
+
+void RET(State8080* state) {
+    // Set pc to the 16bit address taken from the stack
+    // Left shift the upper byte and use inclusive OR to create the
+    // 16bit address
+    state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+
+    // Increment stack pointer
+    state->sp += 2;
+}
+
+
 int Emulate8080(State8080* state)
 {
 	unsigned char *code = &state->memory[state->pc];
@@ -49,7 +105,7 @@ int Emulate8080(State8080* state)
 	state->pc += 1;													// inc pc by 1
 
 	switch(*code) {
-		case 0x00: UnimplementedInstruction(state); break;		//	NOP
+	      case 0x00: UnimplementedInstruction(state); break;		//	NOP
         case 0x01: UnimplementedInstruction(state); break;		//  LXI     B, 16bit_data
         case 0x02: UnimplementedInstruction(state); break;		//	STAX    B
         case 0x03: UnimplementedInstruction(state); break;		//	INX     B
@@ -243,29 +299,44 @@ int Emulate8080(State8080* state)
         case 0xbd: UnimplementedInstruction(state); break;		//  CMP     L
         case 0xbe: UnimplementedInstruction(state); break;		//  CMP     M
         case 0xbf: UnimplementedInstruction(state); break;		//  CMP     A
-        case 0xc0: UnimplementedInstruction(state); break;		//  RNZ
-        case 0xc1: 	
-            //Pop a register pair on stack 					        POP    B
-			{
-                // Pop B and C from stack
-				state->c = state->memory[state->sp];
-				state->b = state->memory[state->sp+1];
-                // Increment pointer
-				state->sp += 2;
-			}
-			break;
-        case 0xc2:
-            //  JNZ address
+        case 0xc0:
+            //  RNZ
             if (0 == state->cc.z) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                RET(state);
             } else {
                 state->pc += 2;
             }
             break;
-        case 0xc3: UnimplementedInstruction(state); break;		//  JMP     address
-        case 0xc4: UnimplementedInstruction(state); break;		//  CNZ     address
+        case 0xc1: 	
+            //Pop a register pair on stack 					        POP    B
+            {
+              // Pop B and C from stack
+              state->c = state->memory[state->sp];
+              state->b = state->memory[state->sp+1];
+              // Increment pointer
+              state->sp += 2;
+            }
+            break;
+        case 0xc2:
+            //  JNZ address
+            if (0 == state->cc.z) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc3:
+            //  JMP address
+            JMP(state, code);
+            break;
+        case 0xc4:
+            // CNZ addr
+            if (0 == state->cc.z) {
+                CALL(state, code);
+            } else {
+                state->pc += 2
+            }
+            break;
         case 0xc5: 			
             //Put a register pair on stack  		                PUSH   B
             {
@@ -277,200 +348,315 @@ int Emulate8080(State8080* state)
             }
             break;
         case 0xc6: UnimplementedInstruction(state); break;		//  ADI     8bit_data
-        case 0xc7: UnimplementedInstruction(state); break;		//  RST     0
-        case 0xc8: UnimplementedInstruction(state); break;		//  RZ
-        case 0xc9: UnimplementedInstruction(state); break;		//  RET
+        case 0xc7:
+            //  RST     0
+            RST(state, 0)
+            break;
+        case 0xc8:
+            // RZ
+            if (1 == state->cc.z) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc9:
+            // RET
+            RET(state);
+            break;
         case 0xca:
             //  JZ address
             if (1 == state->cc.z) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xcb: UnimplementedInstruction(state); break;		//  NOP
-        case 0xcc: UnimplementedInstruction(state); break;		//  CZ      address
-        case 0xcd: UnimplementedInstruction(state); break;		//  CALL    address
+        case 0xcc:
+            // CZ addr
+
+            if (1 == state->cc.z) {
+                CALL(state, code);
+            } else {
+                state->pc += 2
+            }
+            break;
+        case 0xcd:
+            //CALL address
+            CALL(state, code);
+            break;
         case 0xce: UnimplementedInstruction(state); break;		//  ACI     8bit_data
-        case 0xcf: UnimplementedInstruction(state); break;		//  RST     1
-        case 0xd0: UnimplementedInstruction(state); break;		//  RNC
+        case 0xcf:
+            //  RST     1
+            RST(state, 1)
+            break;
+        case 0xd0:
+            //  RNC
+            if (0 == state->cc.cy) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xd1: 			
             // Pop a register pair on stack 			            POP    D
-			{
-                // Pop D and E from stack
-				state->e = state->memory[state->sp];
-				state->d = state->memory[state->sp+1];
-                // Increment pointer
-				state->sp += 2;
-			}
-			break;
+            {
+                      // Pop D and E from stack
+              state->e = state->memory[state->sp];
+              state->d = state->memory[state->sp+1];
+                      // Increment pointer
+              state->sp += 2;
+            }
+            break;
         case 0xd2:
             //  JNC address
             if (0 == state->cc.cy) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xd3: UnimplementedInstruction(state); break;		//  OUT     output_device_num
-        case 0xd4: UnimplementedInstruction(state); break;		//  CNC     address
+        case 0xd4:
+            //  CNC address
+            if (0 == state->cc.cy) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xd5: 				
             //Puts a register pair on the stack		                PUSH   D
-			{
-            // Push D and E onto stack
-			state->memory[state->sp-1] = state->d;
-			state->memory[state->sp-2] = state->e;
-            // Decrement pointer
-			state->sp = state->sp - 2;
-			}
-			break;
+            {
+                  // Push D and E onto stack
+            state->memory[state->sp-1] = state->d;
+            state->memory[state->sp-2] = state->e;
+                  // Decrement pointer
+            state->sp = state->sp - 2;
+            }
+            break;
         case 0xd6: UnimplementedInstruction(state); break;		//  SUI     8bit_data
-        case 0xd7: UnimplementedInstruction(state); break;		//  RST     2
-        case 0xd8: UnimplementedInstruction(state); break;		//  RC
+        case 0xd7:
+            //  RST     2
+            RST(state, 2)
+            break;
+        case 0xd8:
+            //  RC
+            if (1 == state->cc.cy) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xd9: UnimplementedInstruction(state); break;		//  NOP
         case 0xda:
             //  JC address
             if (1 == state->cc.cy) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xdb: UnimplementedInstruction(state); break;		//  IN      input_device_num
-        case 0xdc: UnimplementedInstruction(state); break;		//  CC      address
+        case 0xdc:
+            //  CC address
+            if (1 == state->cc.cy) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xdd: UnimplementedInstruction(state); break;		//  NOP
         case 0xde: UnimplementedInstruction(state); break;		//  SBI     8bit_data
-        case 0xdf: UnimplementedInstruction(state); break;		//  RST     3
-        case 0xe0: UnimplementedInstruction(state); break;		//  RPO
+        case 0xdf:
+            //  RST     3
+            RST(state, 3)
+            break;
+        case 0xe0:
+            //  RPO
+            if (0 == state->cc.p) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xe1: 					
             //Pop a register from the stack                         POP    H
-			{
-                // Pop H and L from stack
-				state->l = state->memory[state->sp];
-				state->h = state->memory[state->sp+1];
-                // Increment counter
-				state->sp += 2;
-			}
-			break;
+            {
+                      // Pop H and L from stack
+              state->l = state->memory[state->sp];
+              state->h = state->memory[state->sp+1];
+                      // Increment counter
+              state->sp += 2;
+            }
+            break;
         case 0xe2:
             //  JPO address
             if (0 == state->cc.p) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2
             }
             break;
         case 0xe3: UnimplementedInstruction(state); break;		//  XTHL
-        case 0xe4: UnimplementedInstruction(state); break;		//  CPO     address
+        case 0xe4:
+            //  CPO     address
+            if (0 == state->cc.p) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xe5: 						
             //Puts a register pair on the stack                   PUSH   H
-			{
-            // Push H and L onto stack
-			state->memory[state->sp-1] = state->h;
-			state->memory[state->sp-2] = state->l;
-            // Decrement pointer
-			state->sp = state->sp - 2;
-			}
-			break;
+            {
+                  // Push H and L onto stack
+            state->memory[state->sp-1] = state->h;
+            state->memory[state->sp-2] = state->l;
+                  // Decrement pointer
+            state->sp = state->sp - 2;
+            }
+            break;
         case 0xe6: UnimplementedInstruction(state); break;		//  ANI     8bit_data
-        case 0xe7: UnimplementedInstruction(state); break;		//  RST     4
-        case 0xe8: UnimplementedInstruction(state); break;		//  RPE
+        case 0xe7:
+            //  RST     4
+            RST(state, 4)
+            break;
+        case 0xe8:
+            //  RPE
+            if (1 == state->cc.p) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xe9: UnimplementedInstruction(state); break;		//  PCHL
         case 0xea:
             // JPE address
             if (1 == state->cc.p) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xeb: UnimplementedInstruction(state); break;		//  XCHG
-        case 0xec: UnimplementedInstruction(state); break;		//  CPE     address
+        case 0xec:
+            //  CPE     address
+            if (1 == state->cc.p) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xed: UnimplementedInstruction(state); break;		//  NOP
         case 0xee: UnimplementedInstruction(state); break;		//  XRI     8bit_data
-        case 0xef: UnimplementedInstruction(state); break;		//  RST     5
-        case 0xf0: UnimplementedInstruction(state); break;		//  RP
+        case 0xef:
+            //  RST     5
+            RST(state, 5)
+            break;
+        case 0xf0:
+            //  RP
+            if (0 == state->cc.s) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
 		case 0xf1:
             // Pops PROGRAM STATUS WORD on the stack                POP PSW
             // PSW combines accumulator A and flag register F
-			{
-                // Copy memory content into accumulator A
-				state->a = state->memory[state->sp+1];
-                // Set psw variable by copying memory
-                // content on top of stack. This is
-                // for flag register F.
-				uint8_t psw = state->memory[state->sp];
-                // Sets state cc struct values if equal
-                // to bitwise AND operation
-				state->cc.z  = (0x01 == (psw & 0x01));
-				state->cc.s  = (0x02 == (psw & 0x02));
-				state->cc.p  = (0x04 == (psw & 0x04));
-				state->cc.cy = (0x05 == (psw & 0x08));
-				state->cc.ac = (0x10 == (psw & 0x10));
-                // Increment pointer
-				state->sp += 2;
-			}
-			break;
+            {
+                      // Copy memory content into accumulator A
+              state->a = state->memory[state->sp+1];
+                      // Set psw variable by copying memory
+                      // content on top of stack. This is
+                      // for flag register F.
+              uint8_t psw = state->memory[state->sp];
+                      // Sets state cc struct values if equal
+                      // to bitwise AND operation
+              state->cc.z  = (0x01 == (psw & 0x01));
+              state->cc.s  = (0x02 == (psw & 0x02));
+              state->cc.p  = (0x04 == (psw & 0x04));
+              state->cc.cy = (0x05 == (psw & 0x08));
+              state->cc.ac = (0x10 == (psw & 0x10));
+                      // Increment pointer
+              state->sp += 2;
+            }
+            break;
         case 0xf2:
             //  JP address
             if (0 == state->cc.s) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xf3: UnimplementedInstruction(state); break;		//  DI
-        case 0xf4: UnimplementedInstruction(state); break;		//  CP      address
+        case 0xf4:
+            //  CP      address
+            if (0 == state->cc.s) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xf5: 						
             // Puts PROGRAM STATUS WORD on the stack                PUSH PSW
             // PSW combines accumulator A and flag register F
-			{
-            // Push accumulator A onto stack
-			state->memory[state->sp-1] = state->a;
-            // Create and set psw int variable by
-            // combining flag register F contained
-            // in state cc struct
-			uint8_t psw = (state->cc.z |
-							state->cc.s << 1 |
-							state->cc.p << 2 |
-							state->cc.cy << 3 |
-							state->cc.ac << 4 );
-            // Push psw onto stack and decrement pointer
-			state->memory[state->sp-2] = psw;
-			state->sp = state->sp - 2;
-			}
-			break;
+            {
+                  // Push accumulator A onto stack
+            state->memory[state->sp-1] = state->a;
+                  // Create and set psw int variable by
+                  // combining flag register F contained
+                  // in state cc struct
+            uint8_t psw = (state->cc.z |
+                    state->cc.s << 1 |
+                    state->cc.p << 2 |
+                    state->cc.cy << 3 |
+                    state->cc.ac << 4 );
+                  // Push psw onto stack and decrement pointer
+            state->memory[state->sp-2] = psw;
+            state->sp = state->sp - 2;
+            }
+			      break;
         case 0xf6: UnimplementedInstruction(state); break;		//  ORI     8bit_data
-        case 0xf7: UnimplementedInstruction(state); break;		//  RST     6
-        case 0xf8: UnimplementedInstruction(state); break;		//  RM
+        case 0xf7:
+            //  RST     6
+            RST(state, 6)
+            break;
+        case 0xf8:
+            //  RM
+            if (1 == state->cc.s) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xf9: UnimplementedInstruction(state); break;		//  SPHL
         case 0xfa:
             //  JM address
             if (1 == state->cc.s) {
-                // Create 16bit address from the opcodes
-                // Leftshift larger byte due to format being little endian
-                state->pc = (opcode[2] << 8) | opcode[1];
+                JMP(state, code);
             } else {
                 state->pc += 2;
             }
             break;
         case 0xfb: UnimplementedInstruction(state); break;		//  EI
-        case 0xfc: UnimplementedInstruction(state); break;		//  CM      address
+        case 0xfc:
+            //  CM      address
+            if (1 == state->cc.s) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
         case 0xfd: UnimplementedInstruction(state); break;		//  NOP
         case 0xfe: UnimplementedInstruction(state); break;		//  CPI     8bit_data
-        case 0xff: UnimplementedInstruction(state); break;		//  RST     7
+        case 0xff:
+            //  RST     7
+            RST(state, 7)
+            break;
 	}
 	// Print out flag condition codes and address data here to keep track of them after each instruction for debugging
 	/*
