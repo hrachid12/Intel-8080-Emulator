@@ -334,7 +334,7 @@ int Emulate8080(State8080* state)
             if (0 == state->cc.z) {
                 CALL(state, code);
             } else {
-                state->pc += 2
+                state->pc += 2;
             }
             break;
         case 0xc5: 			
@@ -350,7 +350,7 @@ int Emulate8080(State8080* state)
         case 0xc6: UnimplementedInstruction(state); break;		//  ADI     8bit_data
         case 0xc7:
             //  RST     0
-            RST(state, 0)
+            RST(state, 0);
             break;
         case 0xc8:
             // RZ
@@ -379,7 +379,7 @@ int Emulate8080(State8080* state)
             if (1 == state->cc.z) {
                 CALL(state, code);
             } else {
-                state->pc += 2
+                state->pc += 2;
             }
             break;
         case 0xcd:
@@ -389,7 +389,7 @@ int Emulate8080(State8080* state)
         case 0xce: UnimplementedInstruction(state); break;		//  ACI     8bit_data
         case 0xcf:
             //  RST     1
-            RST(state, 1)
+            RST(state, 1);
             break;
         case 0xd0:
             //  RNC
@@ -417,7 +417,10 @@ int Emulate8080(State8080* state)
                 state->pc += 2;
             }
             break;
-        case 0xd3: UnimplementedInstruction(state); break;		//  OUT     output_device_num
+        case 0xd3:
+			//OUT placeholder until we get to video and sound.
+			state->pc++;
+			break;
         case 0xd4:
             //  CNC address
             if (0 == state->cc.cy) {
@@ -439,7 +442,7 @@ int Emulate8080(State8080* state)
         case 0xd6: UnimplementedInstruction(state); break;		//  SUI     8bit_data
         case 0xd7:
             //  RST     2
-            RST(state, 2)
+            RST(state, 2);
             break;
         case 0xd8:
             //  RC
@@ -471,7 +474,7 @@ int Emulate8080(State8080* state)
         case 0xde: UnimplementedInstruction(state); break;		//  SBI     8bit_data
         case 0xdf:
             //  RST     3
-            RST(state, 3)
+            RST(state, 3);
             break;
         case 0xe0:
             //  RPO
@@ -496,7 +499,7 @@ int Emulate8080(State8080* state)
             if (0 == state->cc.p) {
                 JMP(state, code);
             } else {
-                state->pc += 2
+                state->pc += 2;
             }
             break;
         case 0xe3: UnimplementedInstruction(state); break;		//  XTHL
@@ -521,7 +524,7 @@ int Emulate8080(State8080* state)
         case 0xe6: UnimplementedInstruction(state); break;		//  ANI     8bit_data
         case 0xe7:
             //  RST     4
-            RST(state, 4)
+            RST(state, 4);
             break;
         case 0xe8:
             //  RPE
@@ -553,7 +556,7 @@ int Emulate8080(State8080* state)
         case 0xee: UnimplementedInstruction(state); break;		//  XRI     8bit_data
         case 0xef:
             //  RST     5
-            RST(state, 5)
+            RST(state, 5);
             break;
         case 0xf0:
             //  RP
@@ -592,7 +595,10 @@ int Emulate8080(State8080* state)
                 state->pc += 2;
             }
             break;
-        case 0xf3: UnimplementedInstruction(state); break;		//  DI
+        case 0xf3:
+            // DI disable processor interrupts flag set.
+            state->int_enable = 0;  
+            break;
         case 0xf4:
             //  CP      address
             if (0 == state->cc.s) {
@@ -623,7 +629,7 @@ int Emulate8080(State8080* state)
         case 0xf6: UnimplementedInstruction(state); break;		//  ORI     8bit_data
         case 0xf7:
             //  RST     6
-            RST(state, 6)
+            RST(state, 6);
             break;
         case 0xf8:
             //  RM
@@ -642,7 +648,10 @@ int Emulate8080(State8080* state)
                 state->pc += 2;
             }
             break;
-        case 0xfb: UnimplementedInstruction(state); break;		//  EI
+        case 0xfb:
+            // EI enable processor interrupts flag set.
+            state->int_enable = 1;  
+            break;
         case 0xfc:
             //  CM      address
             if (1 == state->cc.s) {
@@ -655,7 +664,7 @@ int Emulate8080(State8080* state)
         case 0xfe: UnimplementedInstruction(state); break;		//  CPI     8bit_data
         case 0xff:
             //  RST     7
-            RST(state, 7)
+            RST(state, 7);
             break;
 	}
 	// Print out flag condition codes and address data here to keep track of them after each instruction for debugging
