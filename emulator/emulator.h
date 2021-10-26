@@ -37,6 +37,7 @@ typedef struct State8080 {
 
 int ParityCheck(uint8_t value)
 {
+  // Checks if passed value has even or odd parity
   uint8_t count = 0;
   uint8_t check = 0x01;
   for (int i = 0; i < 8; i++)
@@ -102,7 +103,7 @@ void Arithmetic(State8080* state, uint8_t operand, uint8_t operation, uint8_t ca
   return;
 }
 
-void DAD_rp(State8080 *state, uint32_t reg_pair)
+void DAD(State8080 *state, uint32_t reg_pair)
 {
   // Add register pair to HL (16 bit add)
   uint32_t hl = (state->h << 8 | state->l);
@@ -118,7 +119,7 @@ void DAD_rp(State8080 *state, uint32_t reg_pair)
   return;
 }
 
-void INR_reg(State8080 *state, uint8_t *reg)
+void INR(State8080 *state, uint8_t *reg)
 {
   // Increments register and handles flags
   *reg += 0x01;
@@ -126,7 +127,7 @@ void INR_reg(State8080 *state, uint8_t *reg)
   return;
 }
 
-void DCR_reg(State8080 *state, uint8_t *reg)
+void DCR(State8080 *state, uint8_t *reg)
 {
   // Decrements register and handles flags
   *reg -= 0x01;
@@ -143,6 +144,62 @@ void UnimplementedInstruction(State8080* state)
 	printf("\n");
 	exit(1);
 }
+
+void JMP (State8080* state, char *code) {
+    // Create 16bit address from the opcodes
+    // Left shift larger byte due to format being little endian
+    // Jump to the 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+void CALL (State8080* state, char *code) {
+    uint16_t ret = state->pc+2;
+
+    //Save upper byte
+    state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+    // Save lower byte
+    state->memory[state->sp-2] = (ret & 0xff);
+
+    // Update stack pointer
+    state->sp = state->sp - 2;
+
+    // Create 16bit address from the codes
+    // Leftshift larger byte due to format being little endian
+    // Set pc to the target 16bit address
+    state->pc = (code[2] << 8) | code[1];
+}
+
+void RST (State8080* state, char* num) {
+    uint16_t ret = state->pc+2;
+
+    //Save upper byte
+    state->memory[state->sp-1] = (ret >> 8) & 0xff;
+
+    // Save lower byte
+    state->memory[state->sp-2] = (ret & 0xff);
+
+    // Update stack pointer
+    state->sp = state->sp - 2;
+
+    // Create 16bit address from the number provided
+    // Leftshift number by three to match the required placement
+    // as per the Intel 8080 programming manual (page 37)
+    // Set pc to the target 16bit address
+    state->pc = (num << 3) | 0x0000;
+}
+
+
+void RET(State8080* state) {
+    // Set pc to the 16bit address taken from the stack
+    // Left shift the upper byte and use inclusive OR to create the
+    // 16bit address
+    state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+
+    // Increment stack pointer
+    state->sp += 2;
+}
+
 
 int Emulate8080(State8080* state)
 {
@@ -164,12 +221,12 @@ int Emulate8080(State8080* state)
                     }
                     break;
                   }
-        case 0x04: INR_reg(state, &state->b); break;                            //  INR     B
-        case 0x05: DCR_reg(state, &state->b); break;                            //  DCR     B
+        case 0x04: INR(state, &state->b); break;                                //  INR     B
+        case 0x05: DCR(state, &state->b); break;                                //  DCR     B
         case 0x06: UnimplementedInstruction(state); break;		                  //	MVI     B, 8bit_data
         case 0x07: UnimplementedInstruction(state); break;	                  	//	RLC
         case 0x08: UnimplementedInstruction(state); break;		                  //	NOP
-        case 0x09: DAD_rp(state, (uint32_t)(state->b << 8 | state->c)); break;  //  DAD     BC
+        case 0x09: DAD(state, (uint32_t)(state->b << 8 | state->c)); break;     //  DAD     BC
         case 0x0a: UnimplementedInstruction(state); break;		                  //	LDAX    B
         case 0x0b:                                                              //	DCX     BC
                   {
@@ -179,8 +236,8 @@ int Emulate8080(State8080* state)
                     }
                     break;
                   }
-        case 0x0c: INR_reg(state, &state->c); break;                            //  INR     C
-        case 0x0d: DCR_reg(state, &state->c); break;                            //  DCR     C
+        case 0x0c: INR(state, &state->c); break;                                //  INR     C
+        case 0x0d: DCR(state, &state->c); break;                                //  DCR     C
         case 0x0e: UnimplementedInstruction(state); break;		                  //  MVI     C, 8bit_data
         case 0x0f: UnimplementedInstruction(state); break;		                  //	RRC
         case 0x10: UnimplementedInstruction(state); break;		                  //	NOP
@@ -194,12 +251,12 @@ int Emulate8080(State8080* state)
                     }
                     break;
                   }
-        case 0x14: INR_reg(state, &state->d); break;                            //  INR     D
-        case 0x15: DCR_reg(state, &state->d); break;                            //  DCR     D
+        case 0x14: INR(state, &state->d); break;                                //  INR     D
+        case 0x15: DCR(state, &state->d); break;                                //  DCR     D
         case 0x16: UnimplementedInstruction(state); break;		                  //	MVI     D, 8bit_data
         case 0x17: UnimplementedInstruction(state); break;		                  //	RAL
         case 0x18: UnimplementedInstruction(state); break;		                  //	NOP
-        case 0x19: DAD_rp(state, (uint32_t)(state->d << 8 | state->e)); break;  //  DAD    DE
+        case 0x19: DAD(state, (uint32_t)(state->d << 8 | state->e)); break;     //  DAD     DE
         case 0x1a: UnimplementedInstruction(state); break;		                  //	LDAX    D
         case 0x1b:                                                              //	DCX     DE
                   {
@@ -209,8 +266,8 @@ int Emulate8080(State8080* state)
                     }
                     break;
                   }
-        case 0x1c: INR_reg(state, &state->e); break;                            //  INR     E
-        case 0x1d: DCR_reg(state, &state->e); break;                            //  DCR     E
+        case 0x1c: INR(state, &state->e); break;                                //  INR     E
+        case 0x1d: DCR(state, &state->e); break;                                //  DCR     E
         case 0x1e: UnimplementedInstruction(state); break;		                  //	MVI     E, 8bit_data
         case 0x1f: UnimplementedInstruction(state); break;		                  //	RAR
         case 0x20: UnimplementedInstruction(state); break;		                  //	NOP
@@ -224,12 +281,12 @@ int Emulate8080(State8080* state)
                     }
                     break;
                   }
-        case 0x24: INR_reg(state, &state->h); break;                            //  INR     H
-        case 0x25: DCR_reg(state, &state->h); break;                            //  DCR     H
+        case 0x24: INR(state, &state->h); break;                                //  INR     H
+        case 0x25: DCR(state, &state->h); break;                                //  DCR     H
         case 0x26: UnimplementedInstruction(state); break;		                  //	MVI     H, #$%02x
         case 0x27: UnimplementedInstruction(state); break;		                  //	DAA
         case 0x28: UnimplementedInstruction(state); break;		                  //	NOP
-        case 0x29: DAD_rp(state, (uint32_t)(state->h << 8 | state->l)); break;  //  DAD    HL
+        case 0x29: DAD(state, (uint32_t)(state->h << 8 | state->l)); break;     //  DAD    HL
         case 0x2a: UnimplementedInstruction(state); break;		                  //	LHLD    address
         case 0x2b:                                                              //	DCX     HL
                   {
@@ -239,8 +296,8 @@ int Emulate8080(State8080* state)
                     }
                     break;
                   }
-        case 0x2c: INR_reg(state, &state->l); break;                            //  INR     L
-        case 0x2d: DCR_reg(state, &state->l); break;                            //  DCR     L
+        case 0x2c: INR(state, &state->l); break;                                //  INR     L
+        case 0x2d: DCR(state, &state->l); break;                                //  DCR     L
         case 0x2e: UnimplementedInstruction(state); break;		                  //	MVI     L, 8bit_data
         case 0x2f: UnimplementedInstruction(state); break;		                  //	CMA
         case 0x30: UnimplementedInstruction(state); break;		                  //	NOP
@@ -252,11 +309,11 @@ int Emulate8080(State8080* state)
         case 0x36: UnimplementedInstruction(state); break;		                  //	MVI     M, 8bit_data
         case 0x37: UnimplementedInstruction(state); break;		                  //	STC
         case 0x38: UnimplementedInstruction(state); break;		                  //	NOP
-        case 0x39: DAD_rp(state, (uint32_t)state->sp); break;                   //  DAD    SP
+        case 0x39: DAD(state, (uint32_t)state->sp); break;                      //  DAD     SP
         case 0x3a: UnimplementedInstruction(state); break;		                  //	LDA     address
         case 0x3b: state->sp -= 0x01; break;		                                //	DCX     SP
-        case 0x3c: INR_reg(state, &state->a); break;                            //  INR     A
-        case 0x3d: DCR_reg(state, &state->a); break;                            //  DCR     A
+        case 0x3c: INR(state, &state->a); break;                                //  INR     A
+        case 0x3d: DCR(state, &state->a); break;                                //  DCR     A
         case 0x3e: UnimplementedInstruction(state); break;		                  //	MVI     A, 8bit_data
         case 0x3f: UnimplementedInstruction(state); break;		                  //	CMC
         case 0x40: UnimplementedInstruction(state); break;		                  //	MOV     B, B
@@ -374,86 +431,389 @@ int Emulate8080(State8080* state)
         case 0xae: UnimplementedInstruction(state); break;		                  //  XRA     M
         case 0xaf: UnimplementedInstruction(state); break;		                  //  XRA     A
 
-        case 0xb0: UnimplementedInstruction(state); break;		                  //  ORA     B
-        case 0xb1: UnimplementedInstruction(state); break;		                  //  ORA     C
-        case 0xb2: UnimplementedInstruction(state); break;		                  //  ORA     D
-        case 0xb3: UnimplementedInstruction(state); break;		                  //  ORA     E
-        case 0xb4: UnimplementedInstruction(state); break;		                  //  ORA     H
-        case 0xb5: UnimplementedInstruction(state); break;		                  //  ORA     L
-        case 0xb6: UnimplementedInstruction(state); break;		                  //  ORA     M
-        case 0xb7: UnimplementedInstruction(state); break;		                  //  ORA     A
-        case 0xb8: UnimplementedInstruction(state); break;		                  //  CMP     B
-        case 0xb9: UnimplementedInstruction(state); break;		                  //  CMP     C
-        case 0xba: UnimplementedInstruction(state); break;		                  //  CMP     D
-        case 0xbb: UnimplementedInstruction(state); break;		                  //  CMP     E
-        case 0xbc: UnimplementedInstruction(state); break;		                  //  CMP     H
-        case 0xbd: UnimplementedInstruction(state); break;		                  //  CMP     L
-        case 0xbe: UnimplementedInstruction(state); break;		                  //  CMP     M
-        case 0xbf: UnimplementedInstruction(state); break;		                  //  CMP     A
-        case 0xc0: UnimplementedInstruction(state); break;		                  //  RNZ
-        case 0xc1: UnimplementedInstruction(state); break;		                  //  POP     B
-        case 0xc2: UnimplementedInstruction(state); break;		                  //  JNZ     address
-        case 0xc3: UnimplementedInstruction(state); break;		                  //  JMP     address
-        case 0xc4: UnimplementedInstruction(state); break;		                  //  CNZ     address
-        case 0xc5: UnimplementedInstruction(state); break;		                  //  PUSH    B
+        case 0xb0: UnimplementedInstruction(state); break;		//  ORA     B
+        case 0xb1: UnimplementedInstruction(state); break;		//  ORA     C
+        case 0xb2: UnimplementedInstruction(state); break;		//  ORA     D
+        case 0xb3: UnimplementedInstruction(state); break;		//  ORA     E
+        case 0xb4: UnimplementedInstruction(state); break;		//  ORA     H
+        case 0xb5: UnimplementedInstruction(state); break;		//  ORA     L
+        case 0xb6: UnimplementedInstruction(state); break;		//  ORA     M
+        case 0xb7: UnimplementedInstruction(state); break;		//  ORA     A
+        case 0xb8: UnimplementedInstruction(state); break;		//  CMP     B
+        case 0xb9: UnimplementedInstruction(state); break;		//  CMP     C
+        case 0xba: UnimplementedInstruction(state); break;		//  CMP     D
+        case 0xbb: UnimplementedInstruction(state); break;		//  CMP     E
+        case 0xbc: UnimplementedInstruction(state); break;		//  CMP     H
+        case 0xbd: UnimplementedInstruction(state); break;		//  CMP     L
+        case 0xbe: UnimplementedInstruction(state); break;		//  CMP     M
+        case 0xbf: UnimplementedInstruction(state); break;		//  CMP     A
+        case 0xc0:
+            //  RNZ
+            if (0 == state->cc.z) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc1: 	
+            //Pop a register pair on stack 					        POP    B
+            {
+              // Pop B and C from stack
+              state->c = state->memory[state->sp];
+              state->b = state->memory[state->sp+1];
+              // Increment pointer
+              state->sp += 2;
+            }
+            break;
+        case 0xc2:
+            //  JNZ address
+            if (0 == state->cc.z) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc3:
+            //  JMP address
+            JMP(state, code);
+            break;
+        case 0xc4:
+            // CNZ addr
+            if (0 == state->cc.z) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc5: 			
+            //Put a register pair on stack  		                PUSH   B
+            {
+            // Push B and C onto stack
+            state->memory[state->sp-1] = state->b;
+            state->memory[state->sp-2] = state->c;
+            // Decrement pointer
+            state->sp = state->sp - 2;
+            }
+            break;
         case 0xc6: Arithmetic(state, code[1], ADD, NO_CARRY); state->pc += 1;	break;	//  ADI     8bit_data
-        case 0xc7: UnimplementedInstruction(state); break;		                  //  RST     0
-        case 0xc8: UnimplementedInstruction(state); break;		                  //  RZ
-        case 0xc9: UnimplementedInstruction(state); break;		                  //  RET
-        case 0xca: UnimplementedInstruction(state); break;		                  //  JZ      address
-        case 0xcb: UnimplementedInstruction(state); break;		                  //  NOP
-        case 0xcc: UnimplementedInstruction(state); break;		                  //  CZ      address
-        case 0xcd: UnimplementedInstruction(state); break;		                  //  CALL    address
+        case 0xc7:
+            //  RST     0
+            RST(state, 0);
+            break;
+        case 0xc8:
+            // RZ
+            if (1 == state->cc.z) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xc9:
+            // RET
+            RET(state);
+            break;
+        case 0xca:
+            //  JZ address
+            if (1 == state->cc.z) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xcb: UnimplementedInstruction(state); break;		//  NOP
+        case 0xcc:
+            // CZ addr
+
+            if (1 == state->cc.z) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xcd:
+            //CALL address
+            CALL(state, code);
+            break;
         case 0xce: Arithmetic(state, code[1], ADD, CARRY); state->pc += 1; break;    //  ACI     8bit_data
-        case 0xcf: UnimplementedInstruction(state); break;		                  //  RST     1
-        case 0xd0: UnimplementedInstruction(state); break;		                  //  RNC
-        case 0xd1: UnimplementedInstruction(state); break;		                  //  POP     D
-        case 0xd2: UnimplementedInstruction(state); break;		                  //  JNC     address
-        case 0xd3: UnimplementedInstruction(state); break;		                  //  OUT     output_device_num
-        case 0xd4: UnimplementedInstruction(state); break;		                  //  CNC     address
-        case 0xd5: UnimplementedInstruction(state); break;		                  //  PUSH    D
+        case 0xcf:
+            //  RST     1
+            RST(state, 1);
+            break;
+        case 0xd0:
+            //  RNC
+            if (0 == state->cc.cy) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xd1: 			
+            // Pop a register pair on stack 			            POP    D
+            {
+                      // Pop D and E from stack
+              state->e = state->memory[state->sp];
+              state->d = state->memory[state->sp+1];
+                      // Increment pointer
+              state->sp += 2;
+            }
+            break;
+        case 0xd2:
+            //  JNC address
+            if (0 == state->cc.cy) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xd3:
+			//OUT placeholder until we get to video and sound.
+			state->pc++;
+			break;
+        case 0xd4:
+            //  CNC address
+            if (0 == state->cc.cy) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xd5: 				
+            //Puts a register pair on the stack		                PUSH   D
+            {
+                  // Push D and E onto stack
+            state->memory[state->sp-1] = state->d;
+            state->memory[state->sp-2] = state->e;
+                  // Decrement pointer
+            state->sp = state->sp - 2;
+            }
+            break;
         case 0xd6: Arithmetic(state, code[1], SUB, NO_CARRY); state->pc += 1; break;  //  SUI     8bit_data
-        case 0xd7: UnimplementedInstruction(state); break;		                  //  RST     2
-        case 0xd8: UnimplementedInstruction(state); break;		                  //  RC
-        case 0xd9: UnimplementedInstruction(state); break;		                  //  NOP
-        case 0xda: UnimplementedInstruction(state); break;		                  //  JC      address
-        case 0xdb: UnimplementedInstruction(state); break;		                  //  IN      input_device_num
-        case 0xdc: UnimplementedInstruction(state); break;		                  //  CC      address
-        case 0xdd: UnimplementedInstruction(state); break;		                  //  NOP
+        case 0xd7:
+            //  RST     2
+            RST(state, 2);
+            break;
+        case 0xd8:
+            //  RC
+            if (1 == state->cc.cy) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xd9: UnimplementedInstruction(state); break;		//  NOP
+        case 0xda:
+            //  JC address
+            if (1 == state->cc.cy) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xdb: UnimplementedInstruction(state); break;		//  IN      input_device_num
+        case 0xdc:
+            //  CC address
+            if (1 == state->cc.cy) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xdd: UnimplementedInstruction(state); break;		//  NOP
         case 0xde: Arithmetic(state, code[1], SUB, CARRY); state->pc += 1; break;    //  SBI     8bit_data
-        case 0xdf: UnimplementedInstruction(state); break;		                  //  RST     3
-        case 0xe0: UnimplementedInstruction(state); break;		                  //  RPO
-        case 0xe1: UnimplementedInstruction(state); break;		                  //  POP     H
-        case 0xe2: UnimplementedInstruction(state); break;		                  //  JPO     address
-        case 0xe3: UnimplementedInstruction(state); break;		                  //  XTHL
-        case 0xe4: UnimplementedInstruction(state); break;		                  //  CPO     address
-        case 0xe5: UnimplementedInstruction(state); break;		                  //  PUSH    H
-        case 0xe6: UnimplementedInstruction(state); break;		                  //  ANI     8bit_data
-        case 0xe7: UnimplementedInstruction(state); break;		                  //  RST     4
-        case 0xe8: UnimplementedInstruction(state); break;		                  //  RPE
-        case 0xe9: UnimplementedInstruction(state); break;		                  //  PCHL
-        case 0xea: UnimplementedInstruction(state); break;		                  //  JPE     address
-        case 0xeb: UnimplementedInstruction(state); break;		                  //  XCHG
-        case 0xec: UnimplementedInstruction(state); break;		                  //  CPE     address
-        case 0xed: UnimplementedInstruction(state); break;	                  	//  NOP
-        case 0xee: UnimplementedInstruction(state); break;		                  //  XRI     8bit_data
-        case 0xef: UnimplementedInstruction(state); break;		                  //  RST     5
-        case 0xf0: UnimplementedInstruction(state); break;		                  //  RP
-        case 0xf1: UnimplementedInstruction(state); break;		                  //  POP     PSW
-        case 0xf2: UnimplementedInstruction(state); break;		                  //  JP      address
-        case 0xf3: UnimplementedInstruction(state); break;		                  //  DI
-        case 0xf4: UnimplementedInstruction(state); break;		                  //  CP      address
-        case 0xf5: UnimplementedInstruction(state); break;		                  //  PUSH    PSW
-        case 0xf6: UnimplementedInstruction(state); break;		                  //  ORI     8bit_data
-        case 0xf7: UnimplementedInstruction(state); break;		                  //  RST     6
-        case 0xf8: UnimplementedInstruction(state); break;		                  //  RM
-        case 0xf9: UnimplementedInstruction(state); break;		                  //  SPHL
-        case 0xfa: UnimplementedInstruction(state); break;		                  //  JM      address
-        case 0xfb: UnimplementedInstruction(state); break;		                  //  EI
-        case 0xfc: UnimplementedInstruction(state); break;		                  //  CM      address
-        case 0xfd: UnimplementedInstruction(state); break;		                  //  NOP
-        case 0xfe: UnimplementedInstruction(state); break;		                  //  CPI     8bit_data
-        case 0xff: UnimplementedInstruction(state); break;		                  //  RST     7
+        case 0xdf:
+            //  RST     3
+            RST(state, 3);
+            break;
+        case 0xe0:
+            //  RPO
+            if (0 == state->cc.p) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xe1: 					
+            //Pop a register from the stack                         POP    H
+            {
+                      // Pop H and L from stack
+              state->l = state->memory[state->sp];
+              state->h = state->memory[state->sp+1];
+                      // Increment counter
+              state->sp += 2;
+            }
+            break;
+        case 0xe2:
+            //  JPO address
+            if (0 == state->cc.p) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xe3: UnimplementedInstruction(state); break;		//  XTHL
+        case 0xe4:
+            //  CPO     address
+            if (0 == state->cc.p) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xe5: 						
+            //Puts a register pair on the stack                   PUSH   H
+            {
+                  // Push H and L onto stack
+            state->memory[state->sp-1] = state->h;
+            state->memory[state->sp-2] = state->l;
+                  // Decrement pointer
+            state->sp = state->sp - 2;
+            }
+            break;
+        case 0xe6: UnimplementedInstruction(state); break;		//  ANI     8bit_data
+        case 0xe7:
+            //  RST     4
+            RST(state, 4);
+            break;
+        case 0xe8:
+            //  RPE
+            if (1 == state->cc.p) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xe9: UnimplementedInstruction(state); break;		//  PCHL
+        case 0xea:
+            // JPE address
+            if (1 == state->cc.p) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xeb: UnimplementedInstruction(state); break;		//  XCHG
+        case 0xec:
+            //  CPE     address
+            if (1 == state->cc.p) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xed: UnimplementedInstruction(state); break;		//  NOP
+        case 0xee: UnimplementedInstruction(state); break;		//  XRI     8bit_data
+        case 0xef:
+            //  RST     5
+            RST(state, 5);
+            break;
+        case 0xf0:
+            //  RP
+            if (0 == state->cc.s) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+		    case 0xf1:
+            // Pops PROGRAM STATUS WORD on the stack                POP PSW
+            // PSW combines accumulator A and flag register F
+            {
+                      // Copy memory content into accumulator A
+              state->a = state->memory[state->sp+1];
+                      // Set psw variable by copying memory
+                      // content on top of stack. This is
+                      // for flag register F.
+              uint8_t psw = state->memory[state->sp];
+                      // Sets state cc struct values if equal
+                      // to bitwise AND operation
+              state->cc.z  = (0x01 == (psw & 0x01));
+              state->cc.s  = (0x02 == (psw & 0x02));
+              state->cc.p  = (0x04 == (psw & 0x04));
+              state->cc.cy = (0x05 == (psw & 0x08));
+              state->cc.ac = (0x10 == (psw & 0x10));
+                      // Increment pointer
+              state->sp += 2;
+            }
+            break;
+        case 0xf2:
+            //  JP address
+            if (0 == state->cc.s) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xf3:
+            // DI disable processor interrupts flag set.
+            state->int_enable = 0;  
+            break;
+        case 0xf4:
+            //  CP      address
+            if (0 == state->cc.s) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xf5: 						
+            // Puts PROGRAM STATUS WORD on the stack                PUSH PSW
+            // PSW combines accumulator A and flag register F
+            {
+                  // Push accumulator A onto stack
+            state->memory[state->sp-1] = state->a;
+                  // Create and set psw int variable by
+                  // combining flag register F contained
+                  // in state cc struct
+            uint8_t psw = (state->cc.z |
+                    state->cc.s << 1 |
+                    state->cc.p << 2 |
+                    state->cc.cy << 3 |
+                    state->cc.ac << 4 );
+                  // Push psw onto stack and decrement pointer
+            state->memory[state->sp-2] = psw;
+            state->sp = state->sp - 2;
+            }
+			      break;
+        case 0xf6: UnimplementedInstruction(state); break;		//  ORI     8bit_data
+        case 0xf7:
+            //  RST     6
+            RST(state, 6);
+            break;
+        case 0xf8:
+            //  RM
+            if (1 == state->cc.s) {
+                RET(state);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xf9: UnimplementedInstruction(state); break;		//  SPHL
+        case 0xfa:
+            //  JM address
+            if (1 == state->cc.s) {
+                JMP(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xfb:
+            // EI enable processor interrupts flag set.
+            state->int_enable = 1;  
+            break;
+        case 0xfc:
+            //  CM      address
+            if (1 == state->cc.s) {
+                CALL(state, code);
+            } else {
+                state->pc += 2;
+            }
+            break;
+        case 0xfd: UnimplementedInstruction(state); break;		//  NOP
+        case 0xfe: UnimplementedInstruction(state); break;		//  CPI     8bit_data
+        case 0xff:
+            //  RST     7
+            RST(state, 7);
+            break;
 	}
 
 	printf("\t");
