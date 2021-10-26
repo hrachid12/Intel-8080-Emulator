@@ -3,6 +3,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define  ADD   0
+#define  SUB   1
+
+#define NO_CARRY  0
+#define CARRY     1
+
 typedef struct ConditionCodes {
 	uint8_t		z:1;
 	uint8_t		s:1;
@@ -29,6 +35,105 @@ typedef struct State8080 {
 	uint8_t		int_enable;
 } State8080;
 
+int ParityCheck(uint8_t value)
+{
+  // Checks if passed value has even or odd parity
+  uint8_t count = 0;
+  uint8_t check = 0x01;
+  for (int i = 0; i < 8; i++)
+  {
+    if(value & check){count += 1;}
+    check = check << 1;
+  }
+  // 8080 sets with even parity
+  if (count % 2 == 0)
+  {
+    return 1;
+  }
+  return 0;
+}
+
+void HandleZSP_Flags(State8080* state, uint16_t result)
+{
+  // Handle zero flag
+  if ((result & 0xff) == 0) { state->cc.z = 1; }
+  else { state->cc.z = 0; }
+
+  // Handle sign flag
+  if (result & 0x80) { state->cc.s = 1; }
+  else { state->cc.s = 0; }
+
+  // Handle parity flag
+  state->cc.p = ParityCheck(result & 0xff);
+  
+  return;
+}
+
+void Arithmetic(State8080* state, uint8_t operand, uint8_t operation, uint8_t carry)
+{
+  // Handles ADD, ADI, ADC, ACI, SUB, SUI, SBB, SBI instructions
+  uint16_t result;
+  // Handle operations that use carry bit
+  if (carry)
+  {
+    operand += state->cc.cy;
+  }
+
+  // Addition
+  if (operation == ADD)
+  {
+    result = state->a + operand;
+  }
+  // Subtraction
+  else if (operation == SUB)
+  {
+    result = state->a + (uint8_t)(~operand + 1); // add two's complement of the operand
+  }
+
+  // Handle Zero, Sign, and Parity flags
+  HandleZSP_Flags(state, result);
+
+  // Handle carry flag
+  if (result > 0xff) { state->cc.cy = 1; }
+  else { state->cc.cy = 0; }
+  if (operation == 1) { state->cc.cy ^= 1; }  // carry works opposite in subtraction, so flip bit
+
+  // Store result in A
+  state->a = (result & 0xff);
+  return;
+}
+
+void DAD(State8080 *state, uint32_t reg_pair)
+{
+  // Add register pair to HL (16 bit add)
+  uint32_t hl = (state->h << 8 | state->l);
+  uint32_t result = reg_pair += hl;
+
+  // Handle carry flag
+  if (result & 0x10000) { state->cc.cy = 1; }
+  else { state->cc.cy = 0; }
+  
+  // Store results back in h and l
+  state->l = (uint8_t)result & 0xff;
+  state->h = (uint8_t)(result >> 8) & 0xff;
+  return;
+}
+
+void INR(State8080 *state, uint8_t *reg)
+{
+  // Increments register and handles flags
+  *reg += 0x01;
+  HandleZSP_Flags(state, *reg);
+  return;
+}
+
+void DCR(State8080 *state, uint8_t *reg)
+{
+  // Decrements register and handles flags
+  *reg -= 0x01;
+  HandleZSP_Flags(state, *reg);
+  return;
+}
 
 void UnimplementedInstruction(State8080* state)
 {
@@ -105,183 +210,226 @@ int Emulate8080(State8080* state)
 	state->pc += 1;													// inc pc by 1
 
 	switch(*code) {
-	      case 0x00: UnimplementedInstruction(state); break;		//	NOP
-        case 0x01: UnimplementedInstruction(state); break;		//  LXI     B, 16bit_data
-        case 0x02: UnimplementedInstruction(state); break;		//	STAX    B
-        case 0x03: UnimplementedInstruction(state); break;		//	INX     B
-        case 0x04: UnimplementedInstruction(state); break;		//	INR     B
-        case 0x05: UnimplementedInstruction(state); break;		//	DCR     B
-        case 0x06: UnimplementedInstruction(state); break;		//	MVI     B, 8bit_data
-        case 0x07: UnimplementedInstruction(state); break;		//	RLC
-        case 0x08: UnimplementedInstruction(state); break;		//	NOP
-        case 0x09: UnimplementedInstruction(state); break;		//	DAD     B
-        case 0x0a: UnimplementedInstruction(state); break;		//	LDAX    B
-        case 0x0b: UnimplementedInstruction(state); break;		//	DCX     B
-        case 0x0c: UnimplementedInstruction(state); break;		//	INR     C
-        case 0x0d: UnimplementedInstruction(state); break;		//	DCR     C
-        case 0x0e: UnimplementedInstruction(state); break;		//  MVI     C, 8bit_data
-        case 0x0f: UnimplementedInstruction(state); break;		//	RRC
-        case 0x10: UnimplementedInstruction(state); break;		//	NOP
-        case 0x11: UnimplementedInstruction(state); break;		//	LXI     D, 16bit_data
-        case 0x12: UnimplementedInstruction(state); break;		//	STAX    D
-        case 0x13: UnimplementedInstruction(state); break;		//	INX     D
-        case 0x14: UnimplementedInstruction(state); break;		//	INR     D
-        case 0x15: UnimplementedInstruction(state); break;		//	DCR     D
-        case 0x16: UnimplementedInstruction(state); break;		//	MVI     D, 8bit_data
-        case 0x17: UnimplementedInstruction(state); break;		//	RAL
-        case 0x18: UnimplementedInstruction(state); break;		//	NOP
-        case 0x19: UnimplementedInstruction(state); break;		//	DAD     D
-        case 0x1a: UnimplementedInstruction(state); break;		//	LDAX    D
-        case 0x1b: UnimplementedInstruction(state); break;		//	DCX     D
-        case 0x1c: UnimplementedInstruction(state); break;		//	INR     E
-        case 0x1d: UnimplementedInstruction(state); break;		//	DCR     E
-        case 0x1e: UnimplementedInstruction(state); break;		//	MVI     E, 8bit_data
-        case 0x1f: UnimplementedInstruction(state); break;		//	RAR
-        case 0x20: UnimplementedInstruction(state); break;		//	NOP
-        case 0x21: UnimplementedInstruction(state); break;		//	LXI     H, 16bit_data
-        case 0x22: UnimplementedInstruction(state); break;		//	SHLD    address
-        case 0x23: UnimplementedInstruction(state); break;		//	INX     H
-        case 0x24: UnimplementedInstruction(state); break;		//	INR     H
-        case 0x25: UnimplementedInstruction(state); break;		//	DCR     H
-        case 0x26: UnimplementedInstruction(state); break;		//	MVI     H, #$%02x
-        case 0x27: UnimplementedInstruction(state); break;		//	DAA
-        case 0x28: UnimplementedInstruction(state); break;		//	NOP
-        case 0x29: UnimplementedInstruction(state); break;		//	DAD     H
-        case 0x2a: UnimplementedInstruction(state); break;		//	LHLD    address
-        case 0x2b: UnimplementedInstruction(state); break;		//	DCX     H
-        case 0x2c: UnimplementedInstruction(state); break;		//	INR     L
-        case 0x2d: UnimplementedInstruction(state); break;		//	DCR     L
-        case 0x2e: UnimplementedInstruction(state); break;		//	MVI     L, 8bit_data
-        case 0x2f: UnimplementedInstruction(state); break;		//	CMA
-        case 0x30: UnimplementedInstruction(state); break;		//	NOP
-        case 0x31: UnimplementedInstruction(state); break;		//	LXI     SP, 16bit_data
-        case 0x32: UnimplementedInstruction(state); break;		//	STA     address
-        case 0x33: UnimplementedInstruction(state); break;		//	INX     SP
-        case 0x34: UnimplementedInstruction(state); break;		//	INR     M
-        case 0x35: UnimplementedInstruction(state); break;		//	DCR     M
-        case 0x36: UnimplementedInstruction(state); break;		//	MVI     M, 8bit_data
-        case 0x37: UnimplementedInstruction(state); break;		//	STC
-        case 0x38: UnimplementedInstruction(state); break;		//	NOP
-        case 0x39: UnimplementedInstruction(state); break;		//	DAD     SP
-        case 0x3a: UnimplementedInstruction(state); break;		//	LDA     address
-        case 0x3b: UnimplementedInstruction(state); break;		//	DCX     SP
-        case 0x3c: UnimplementedInstruction(state); break;		//	INR     A
-        case 0x3d: UnimplementedInstruction(state); break;		//	DCR     A
-        case 0x3e: UnimplementedInstruction(state); break;		//	MVI     A, 8bit_data
-        case 0x3f: UnimplementedInstruction(state); break;		//	CMC
-        case 0x40: UnimplementedInstruction(state); break;		//	MOV     B, B
-        case 0x41: UnimplementedInstruction(state); break;		//	MOV     B, C
-        case 0x42: UnimplementedInstruction(state); break;		//	MOV     B, D
-        case 0x43: UnimplementedInstruction(state); break;		//	MOV     B, E
-        case 0x44: UnimplementedInstruction(state); break;		//	MOV     B, H
-        case 0x45: UnimplementedInstruction(state); break;		//	MOV     B, L
-        case 0x46: UnimplementedInstruction(state); break;		//	MOV     B, M
-        case 0x47: UnimplementedInstruction(state); break;		//	MOV     B, A
-        case 0x48: UnimplementedInstruction(state); break;		//	MOV     C, B
-        case 0x49: UnimplementedInstruction(state); break;		//	MOV     C, C
-        case 0x4a: UnimplementedInstruction(state); break;		//	MOV     C, D
-        case 0x4b: UnimplementedInstruction(state); break;		//	MOV     C, E
-        case 0x4c: UnimplementedInstruction(state); break;		//	MOV     C, H
-        case 0x4d: UnimplementedInstruction(state); break;		//	MOV     C, L
-        case 0x4e: UnimplementedInstruction(state); break;		//	MOV     C, M
-        case 0x4f: UnimplementedInstruction(state); break;		//	MOV     C, A
-        case 0x50: UnimplementedInstruction(state); break;		//	MOV     D, B
-        case 0x51: UnimplementedInstruction(state); break;		//	MOV     D, C
-        case 0x52: UnimplementedInstruction(state); break;		//	MOV     D, D
-        case 0x53: UnimplementedInstruction(state); break;		//	MOV     D, E
-        case 0x54: UnimplementedInstruction(state); break;		//	MOV     D, H
-        case 0x55: UnimplementedInstruction(state); break;		//	MOV     D, L
+				case 0x00: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x01: UnimplementedInstruction(state); break;		                  //  LXI     B, 16bit_data
+        case 0x02: UnimplementedInstruction(state); break;		                  //	STAX    B
+        case 0x03:                                                              //	INX     BC
+                  {
+                    state->c += 0x01; 
+                    if ((state->c & 0xff) == 0){
+                      state->b += 0x01;
+                    }
+                    break;
+                  }
+        case 0x04: INR(state, &state->b); break;                                //  INR     B
+        case 0x05: DCR(state, &state->b); break;                                //  DCR     B
+        case 0x06: UnimplementedInstruction(state); break;		                  //	MVI     B, 8bit_data
+        case 0x07: UnimplementedInstruction(state); break;	                  	//	RLC
+        case 0x08: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x09: DAD(state, (uint32_t)(state->b << 8 | state->c)); break;     //  DAD     BC
+        case 0x0a: UnimplementedInstruction(state); break;		                  //	LDAX    B
+        case 0x0b:                                                              //	DCX     BC
+                  {
+                    state->c -= 0x01;
+                    if ((state->c & 0xff) == 0xff){
+                      state->b -= 0x01;
+                    }
+                    break;
+                  }
+        case 0x0c: INR(state, &state->c); break;                                //  INR     C
+        case 0x0d: DCR(state, &state->c); break;                                //  DCR     C
+        case 0x0e: UnimplementedInstruction(state); break;		                  //  MVI     C, 8bit_data
+        case 0x0f: UnimplementedInstruction(state); break;		                  //	RRC
+        case 0x10: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x11: UnimplementedInstruction(state); break;		                  //	LXI     D, 16bit_data
+        case 0x12: UnimplementedInstruction(state); break;		                  //	STAX    D
+        case 0x13:                                                              //	INX     DE
+                  {
+                    state->e += 0x01; 
+                    if ((state->e & 0xff) == 0){
+                      state->d += 0x01;
+                    }
+                    break;
+                  }
+        case 0x14: INR(state, &state->d); break;                                //  INR     D
+        case 0x15: DCR(state, &state->d); break;                                //  DCR     D
+        case 0x16: UnimplementedInstruction(state); break;		                  //	MVI     D, 8bit_data
+        case 0x17: UnimplementedInstruction(state); break;		                  //	RAL
+        case 0x18: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x19: DAD(state, (uint32_t)(state->d << 8 | state->e)); break;     //  DAD     DE
+        case 0x1a: UnimplementedInstruction(state); break;		                  //	LDAX    D
+        case 0x1b:                                                              //	DCX     DE
+                  {
+                    state->e -= 0x01;
+                    if ((state->e & 0xff) == 0xff){
+                      state->d -= 0x01;
+                    }
+                    break;
+                  }
+        case 0x1c: INR(state, &state->e); break;                                //  INR     E
+        case 0x1d: DCR(state, &state->e); break;                                //  DCR     E
+        case 0x1e: UnimplementedInstruction(state); break;		                  //	MVI     E, 8bit_data
+        case 0x1f: UnimplementedInstruction(state); break;		                  //	RAR
+        case 0x20: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x21: UnimplementedInstruction(state); break;		                  //	LXI     H, 16bit_data
+        case 0x22: UnimplementedInstruction(state); break;		                  //	SHLD    address
+        case 0x23:                                                              //	INX     HL
+                  {
+                    state->l += 0x01; 
+                    if ((state->l & 0xff) == 0){
+                      state->h += 0x01;
+                    }
+                    break;
+                  }
+        case 0x24: INR(state, &state->h); break;                                //  INR     H
+        case 0x25: DCR(state, &state->h); break;                                //  DCR     H
+        case 0x26: UnimplementedInstruction(state); break;		                  //	MVI     H, #$%02x
+        case 0x27: UnimplementedInstruction(state); break;		                  //	DAA
+        case 0x28: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x29: DAD(state, (uint32_t)(state->h << 8 | state->l)); break;     //  DAD    HL
+        case 0x2a: UnimplementedInstruction(state); break;		                  //	LHLD    address
+        case 0x2b:                                                              //	DCX     HL
+                  {
+                    state->l -= 0x01;
+                    if ((state->l & 0xff) == 0xff){
+                      state->h -= 0x01;
+                    }
+                    break;
+                  }
+        case 0x2c: INR(state, &state->l); break;                                //  INR     L
+        case 0x2d: DCR(state, &state->l); break;                                //  DCR     L
+        case 0x2e: UnimplementedInstruction(state); break;		                  //	MVI     L, 8bit_data
+        case 0x2f: UnimplementedInstruction(state); break;		                  //	CMA
+        case 0x30: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x31: UnimplementedInstruction(state); break;		                  //	LXI     SP, 16bit_data
+        case 0x32: UnimplementedInstruction(state); break;		                  //	STA     address
+        case 0x33: state->sp += 0x01; break;		                                //	INX     SP
+        case 0x34: UnimplementedInstruction(state); break;		                  //	INR     M
+        case 0x35: UnimplementedInstruction(state); break;		                  //	DCR     M
+        case 0x36: UnimplementedInstruction(state); break;		                  //	MVI     M, 8bit_data
+        case 0x37: UnimplementedInstruction(state); break;		                  //	STC
+        case 0x38: UnimplementedInstruction(state); break;		                  //	NOP
+        case 0x39: DAD(state, (uint32_t)state->sp); break;                      //  DAD     SP
+        case 0x3a: UnimplementedInstruction(state); break;		                  //	LDA     address
+        case 0x3b: state->sp -= 0x01; break;		                                //	DCX     SP
+        case 0x3c: INR(state, &state->a); break;                                //  INR     A
+        case 0x3d: DCR(state, &state->a); break;                                //  DCR     A
+        case 0x3e: UnimplementedInstruction(state); break;		                  //	MVI     A, 8bit_data
+        case 0x3f: UnimplementedInstruction(state); break;		                  //	CMC
+        case 0x40: UnimplementedInstruction(state); break;		                  //	MOV     B, B
+        case 0x41: UnimplementedInstruction(state); break;		                  //	MOV     B, C
+        case 0x42: UnimplementedInstruction(state); break;		                  //	MOV     B, D
+        case 0x43: UnimplementedInstruction(state); break;		                  //	MOV     B, E
+        case 0x44: UnimplementedInstruction(state); break;		                  //	MOV     B, H
+        case 0x45: UnimplementedInstruction(state); break;		                  //	MOV     B, L
+        case 0x46: UnimplementedInstruction(state); break;		                  //	MOV     B, M
+        case 0x47: UnimplementedInstruction(state); break;		                  //	MOV     B, A
+        case 0x48: UnimplementedInstruction(state); break;		                  //	MOV     C, B
+        case 0x49: UnimplementedInstruction(state); break;		                  //	MOV     C, C
+        case 0x4a: UnimplementedInstruction(state); break;		                  //	MOV     C, D
+        case 0x4b: UnimplementedInstruction(state); break;		                  //	MOV     C, E
+        case 0x4c: UnimplementedInstruction(state); break;		                  //	MOV     C, H
+        case 0x4d: UnimplementedInstruction(state); break;		                  //	MOV     C, L
+        case 0x4e: UnimplementedInstruction(state); break;		                  //	MOV     C, M
+        case 0x4f: UnimplementedInstruction(state); break;		                  //	MOV     C, A
+        case 0x50: UnimplementedInstruction(state); break;		                  //	MOV     D, B
+        case 0x51: UnimplementedInstruction(state); break;		                  //	MOV     D, C
+        case 0x52: UnimplementedInstruction(state); break;		                  //	MOV     D, D
+        case 0x53: UnimplementedInstruction(state); break;		                  //	MOV     D, E
+        case 0x54: UnimplementedInstruction(state); break;		                  //	MOV     D, H
+        case 0x55: UnimplementedInstruction(state); break;		                  //	MOV     D, L
 
-        case 0x56: UnimplementedInstruction(state); break;		//	MOV     D, M
-        case 0x57: UnimplementedInstruction(state); break;		//	MOV     D, A
-        case 0x58: UnimplementedInstruction(state); break;		//	MOV     E, B
-        case 0x59: UnimplementedInstruction(state); break;		//	MOV     E, C
-        case 0x5a: UnimplementedInstruction(state); break;		//	MOV     E, D
-        case 0x5b: UnimplementedInstruction(state); break;		//	MOV     E, E
-        case 0x5c: UnimplementedInstruction(state); break;		//	MOV     E, H
-        case 0x5d: UnimplementedInstruction(state); break;		//	MOV     E, L
-        case 0x5e: UnimplementedInstruction(state); break;		//	MOV     E, M
-        case 0x5f: UnimplementedInstruction(state); break;		//	MOV     E, A
-        case 0x60: UnimplementedInstruction(state); break;		//	MOV     H, B
-        case 0x61: UnimplementedInstruction(state); break;		//	MOV     H, C
-        case 0x62: UnimplementedInstruction(state); break;		//	MOV     H, D
-        case 0x63: UnimplementedInstruction(state); break;		//	MOV     H, E
-        case 0x64: UnimplementedInstruction(state); break;		//	MOV     H, H
-        case 0x65: UnimplementedInstruction(state); break;		//	MOV     H, L
-        case 0x66: UnimplementedInstruction(state); break;		//	MOV     H, M
-        case 0x67: UnimplementedInstruction(state); break;		//	MOV     H, A
-        case 0x68: UnimplementedInstruction(state); break;		//	MOV     L, B
-        case 0x69: UnimplementedInstruction(state); break;		//	MOV     L, C
-        case 0x6a: UnimplementedInstruction(state); break;		//	MOV     L, D
-        case 0x6b: UnimplementedInstruction(state); break;		//	MOV     L, E
-        case 0x6c: UnimplementedInstruction(state); break;		//	MOV     L, H
-        case 0x6d: UnimplementedInstruction(state); break;		//	MOV     L, L
-        case 0x6e: UnimplementedInstruction(state); break;		//	MOV     L, M
-        case 0x6f: UnimplementedInstruction(state); break;		//	MOV     L, A
-        case 0x70: UnimplementedInstruction(state); break;		//	MOV     M, B
-        case 0x71: UnimplementedInstruction(state); break;		//	MOV     M, C
-        case 0x72: UnimplementedInstruction(state); break;		//	MOV     M, D
-        case 0x73: UnimplementedInstruction(state); break;		//	MOV     M, E
-        case 0x74: UnimplementedInstruction(state); break;		//	MOV     M, H
-        case 0x75: UnimplementedInstruction(state); break;		//	MOV     M, L
-        case 0x76: UnimplementedInstruction(state); break;		//	HLT
-        case 0x77: UnimplementedInstruction(state); break;		//	MOV     M, A
-        case 0x78: UnimplementedInstruction(state); break;		//	MOV     A, B
-        case 0x79: UnimplementedInstruction(state); break;		//	MOV     A, C
-        case 0x7a: UnimplementedInstruction(state); break;		//	MOV     A, D
-        case 0x7b: UnimplementedInstruction(state); break;		//	MOV     A, E
-        case 0x7c: UnimplementedInstruction(state); break;		//	MOV     A, H
-        case 0x7d: UnimplementedInstruction(state); break;		//	MOV     A, L
-        case 0x7e: UnimplementedInstruction(state); break;		//	MOV     A, M
-        case 0x7f: UnimplementedInstruction(state); break;		//	MOV     A, A
-        case 0x80: UnimplementedInstruction(state); break;		//	ADD     B
-        case 0x81: UnimplementedInstruction(state); break;		//	ADD     C
-        case 0x82: UnimplementedInstruction(state); break;		//	ADD     D
-        case 0x83: UnimplementedInstruction(state); break;		//	ADD     E
-        case 0x84: UnimplementedInstruction(state); break;		//	ADD     H
-        case 0x85: UnimplementedInstruction(state); break;		//	ADD     L
-        case 0x86: UnimplementedInstruction(state); break;		//	ADD     M
-        case 0x87: UnimplementedInstruction(state); break;		//	ADD     A
-        case 0x88: UnimplementedInstruction(state); break;		//	ADC     B
-        case 0x89: UnimplementedInstruction(state); break;		//	ADC     C
-        case 0x8a: UnimplementedInstruction(state); break;		//	ADC     D
-        case 0x8b: UnimplementedInstruction(state); break;		//	ADC     E
-        case 0x8c: UnimplementedInstruction(state); break;		//	ADC     H
-        case 0x8d: UnimplementedInstruction(state); break;		//	ADC     L
-        case 0x8e: UnimplementedInstruction(state); break;		//	ADC     M
-        case 0x8f: UnimplementedInstruction(state); break;		//	ADC     A
-        case 0x90: UnimplementedInstruction(state); break;		//	SUB     B
-        case 0x91: UnimplementedInstruction(state); break;		//	SUB     C
-        case 0x92: UnimplementedInstruction(state); break;		//	SUB     D
-        case 0x93: UnimplementedInstruction(state); break;		//	SUB     E
-        case 0x94: UnimplementedInstruction(state); break;		//	SUB     H
-        case 0x95: UnimplementedInstruction(state); break;		//	SUB     L
-        case 0x96: UnimplementedInstruction(state); break;		//	SUB     M
-        case 0x97: UnimplementedInstruction(state); break;		//	SUB     A
-        case 0x98: UnimplementedInstruction(state); break;		//	SBB     B
-        case 0x99: UnimplementedInstruction(state); break;		//	SBB     C
-        case 0x9a: UnimplementedInstruction(state); break;		//	SBB     D
-        case 0x9b: UnimplementedInstruction(state); break;		//	SBB     E
-        case 0x9c: UnimplementedInstruction(state); break;		//	SBB     H
-        case 0x9d: UnimplementedInstruction(state); break;		//	SBB     L
-        case 0x9e: UnimplementedInstruction(state); break;		//	SBB     M
-        case 0x9f: UnimplementedInstruction(state); break;		//	SBB     A
-        case 0xa0: UnimplementedInstruction(state); break;		//	ANA     B
-        case 0xa1: UnimplementedInstruction(state); break;		//	ANA     C
-        case 0xa2: UnimplementedInstruction(state); break;		//	ANA     D
-        case 0xa3: UnimplementedInstruction(state); break;		//	ANA     E
-        case 0xa4: UnimplementedInstruction(state); break;		//	ANA     H
-        case 0xa5: UnimplementedInstruction(state); break;		//	ANA     L
-        case 0xa6: UnimplementedInstruction(state); break;		//	ANA     M
-        case 0xa7: UnimplementedInstruction(state); break; 		// 	ANA     A
-        case 0xa8: UnimplementedInstruction(state); break;		//	XRA     B
-        case 0xa9: UnimplementedInstruction(state); break;		//  XRA     C
-        case 0xaa: UnimplementedInstruction(state); break;		//  XRA     D
-        case 0xab: UnimplementedInstruction(state); break;		//  XRA     E
-        case 0xac: UnimplementedInstruction(state); break;		//  XRA     H
-        case 0xad: UnimplementedInstruction(state); break;		//  XRA     L
-        case 0xae: UnimplementedInstruction(state); break;		//  XRA     M
-        case 0xaf: UnimplementedInstruction(state); break;		//  XRA     A
+        case 0x56: UnimplementedInstruction(state); break;		                  //	MOV     D, M
+        case 0x57: UnimplementedInstruction(state); break;		                  //	MOV     D, A
+        case 0x58: UnimplementedInstruction(state); break;		                  //	MOV     E, B
+        case 0x59: UnimplementedInstruction(state); break;		                  //	MOV     E, C
+        case 0x5a: UnimplementedInstruction(state); break;		                  //	MOV     E, D
+        case 0x5b: UnimplementedInstruction(state); break;		                  //	MOV     E, E
+        case 0x5c: UnimplementedInstruction(state); break;		                  //	MOV     E, H
+        case 0x5d: UnimplementedInstruction(state); break;		                  //	MOV     E, L
+        case 0x5e: UnimplementedInstruction(state); break;		                  //	MOV     E, M
+        case 0x5f: UnimplementedInstruction(state); break;		                  //	MOV     E, A
+        case 0x60: UnimplementedInstruction(state); break;		                  //	MOV     H, B
+        case 0x61: UnimplementedInstruction(state); break;		                  //	MOV     H, C
+        case 0x62: UnimplementedInstruction(state); break;		                  //	MOV     H, D
+        case 0x63: UnimplementedInstruction(state); break;		                  //	MOV     H, E
+        case 0x64: UnimplementedInstruction(state); break;		                  //	MOV     H, H
+        case 0x65: UnimplementedInstruction(state); break;		                  //	MOV     H, L
+        case 0x66: UnimplementedInstruction(state); break;		                  //	MOV     H, M
+        case 0x67: UnimplementedInstruction(state); break;		                  //	MOV     H, A
+        case 0x68: UnimplementedInstruction(state); break;		                  //	MOV     L, B
+        case 0x69: UnimplementedInstruction(state); break;		                  //	MOV     L, C
+        case 0x6a: UnimplementedInstruction(state); break;		                  //	MOV     L, D
+        case 0x6b: UnimplementedInstruction(state); break;		                  //	MOV     L, E
+        case 0x6c: UnimplementedInstruction(state); break;		                  //	MOV     L, H
+        case 0x6d: UnimplementedInstruction(state); break;		                  //	MOV     L, L
+        case 0x6e: UnimplementedInstruction(state); break;		                  //	MOV     L, M
+        case 0x6f: UnimplementedInstruction(state); break;		                  //	MOV     L, A
+        case 0x70: UnimplementedInstruction(state); break;		                  //	MOV     M, B
+        case 0x71: UnimplementedInstruction(state); break;		                  //	MOV     M, C
+        case 0x72: UnimplementedInstruction(state); break;		                  //	MOV     M, D
+        case 0x73: UnimplementedInstruction(state); break;		                  //	MOV     M, E
+        case 0x74: UnimplementedInstruction(state); break;		                  //	MOV     M, H
+        case 0x75: UnimplementedInstruction(state); break;		                  //	MOV     M, L
+        case 0x76: UnimplementedInstruction(state); break;		                  //	HLT
+        case 0x77: UnimplementedInstruction(state); break;		                  //	MOV     M, A
+        case 0x78: UnimplementedInstruction(state); break;		                  //	MOV     A, B
+        case 0x79: UnimplementedInstruction(state); break;		                  //	MOV     A, C
+        case 0x7a: UnimplementedInstruction(state); break;		                  //	MOV     A, D
+        case 0x7b: UnimplementedInstruction(state); break;		                  //	MOV     A, E
+        case 0x7c: UnimplementedInstruction(state); break;	                  	//	MOV     A, H
+        case 0x7d: UnimplementedInstruction(state); break;	                  	//	MOV     A, L
+        case 0x7e: UnimplementedInstruction(state); break;	                  	//	MOV     A, M
+        case 0x7f: UnimplementedInstruction(state); break;	                  	//	MOV     A, A
+
+        case 0x80: Arithmetic(state, state->b, ADD, NO_CARRY); break;           //  ADD     B
+        case 0x81: Arithmetic(state, state->c, ADD, NO_CARRY); break;	          //	ADD     C
+        case 0x82: Arithmetic(state, state->d, ADD, NO_CARRY); break;		        //	ADD     D
+        case 0x83: Arithmetic(state, state->e, ADD, NO_CARRY); break;		        //	ADD     E
+        case 0x84: Arithmetic(state, state->h, ADD, NO_CARRY); break;		        //	ADD     H
+        case 0x85: Arithmetic(state, state->l, ADD, NO_CARRY); break;		        //	ADD     L
+        case 0x86: UnimplementedInstruction(state); break;		                  //	ADD     M
+        case 0x87: Arithmetic(state, state->a, ADD, NO_CARRY); break;		        //	ADD     A
+        case 0x88: Arithmetic(state, state->b, ADD, CARRY); break;		          //	ADC     B
+        case 0x89: Arithmetic(state, state->c, ADD, CARRY);	break;              //	ADC     C
+        case 0x8a: Arithmetic(state, state->d, ADD, CARRY);	break;  	          //	ADC     D
+        case 0x8b: Arithmetic(state, state->e, ADD, CARRY);	break;		          //	ADC     E
+        case 0x8c: Arithmetic(state, state->h, ADD, CARRY);	break;		          //	ADC     H
+        case 0x8d: Arithmetic(state, state->l, ADD, CARRY);	break;		          //	ADC     L
+        case 0x8e: UnimplementedInstruction(state); break;		                  //	ADC     M
+        case 0x8f: Arithmetic(state, state->a, ADD, CARRY);	break;		          //	ADC     A
+        case 0x90: Arithmetic(state, state->b, SUB, NO_CARRY);	break;		      //	SUB     B
+        case 0x91: Arithmetic(state, state->c, SUB, NO_CARRY);	break;		      //	SUB     C
+        case 0x92: Arithmetic(state, state->d, SUB, NO_CARRY);	break;		      //	SUB     D
+        case 0x93: Arithmetic(state, state->e, SUB, NO_CARRY);	break;		      //	SUB     E
+        case 0x94: Arithmetic(state, state->h, SUB, NO_CARRY);	break;		      //	SUB     H
+        case 0x95: Arithmetic(state, state->l, SUB, NO_CARRY);	break;		      //	SUB     L
+        case 0x96: UnimplementedInstruction(state); break;		                  //	SUB     M
+        case 0x97: Arithmetic(state, state->a, SUB, NO_CARRY);	break;		      //	SUB     A
+        case 0x98: Arithmetic(state, state->b, SUB, CARRY);	break;		          //	SBB     B
+        case 0x99: Arithmetic(state, state->c, SUB, CARRY);	break;		          //	SBB     C
+        case 0x9a: Arithmetic(state, state->d, SUB, CARRY);	break;		          //	SBB     D
+        case 0x9b: Arithmetic(state, state->e, SUB, CARRY);	break;		          //	SBB     E
+        case 0x9c: Arithmetic(state, state->h, SUB, CARRY);	break;		          //	SBB     H
+        case 0x9d: Arithmetic(state, state->l, SUB, CARRY);	break;		          //	SBB     L
+        case 0x9e: UnimplementedInstruction(state); break;		                  //	SBB     M
+        case 0x9f: Arithmetic(state, state->a, SUB, CARRY);	break;		          //	SBB     A
+        case 0xa0: UnimplementedInstruction(state); break;		                  //	ANA     B
+        case 0xa1: UnimplementedInstruction(state); break;		                  //	ANA     C
+        case 0xa2: UnimplementedInstruction(state); break;		                  //	ANA     D
+        case 0xa3: UnimplementedInstruction(state); break;		                  //	ANA     E
+        case 0xa4: UnimplementedInstruction(state); break;		                  //	ANA     H
+        case 0xa5: UnimplementedInstruction(state); break;		                  //	ANA     L
+        case 0xa6: UnimplementedInstruction(state); break;		                  //	ANA     M
+        case 0xa7: UnimplementedInstruction(state); break; 		                  // 	ANA     A
+        case 0xa8: UnimplementedInstruction(state); break;		                  //	XRA     B
+        case 0xa9: UnimplementedInstruction(state); break;		                  //  XRA     C
+        case 0xaa: UnimplementedInstruction(state); break;		                  //  XRA     D
+        case 0xab: UnimplementedInstruction(state); break;		                  //  XRA     E
+        case 0xac: UnimplementedInstruction(state); break;		                  //  XRA     H
+        case 0xad: UnimplementedInstruction(state); break;		                  //  XRA     L
+        case 0xae: UnimplementedInstruction(state); break;		                  //  XRA     M
+        case 0xaf: UnimplementedInstruction(state); break;		                  //  XRA     A
 
         case 0xb0: UnimplementedInstruction(state); break;		//  ORA     B
         case 0xb1: UnimplementedInstruction(state); break;		//  ORA     C
@@ -347,7 +495,7 @@ int Emulate8080(State8080* state)
             state->sp = state->sp - 2;
             }
             break;
-        case 0xc6: UnimplementedInstruction(state); break;		//  ADI     8bit_data
+        case 0xc6: Arithmetic(state, code[1], ADD, NO_CARRY); state->pc += 1;	break;	//  ADI     8bit_data
         case 0xc7:
             //  RST     0
             RST(state, 0);
@@ -386,7 +534,7 @@ int Emulate8080(State8080* state)
             //CALL address
             CALL(state, code);
             break;
-        case 0xce: UnimplementedInstruction(state); break;		//  ACI     8bit_data
+        case 0xce: Arithmetic(state, code[1], ADD, CARRY); state->pc += 1; break;    //  ACI     8bit_data
         case 0xcf:
             //  RST     1
             RST(state, 1);
@@ -439,7 +587,7 @@ int Emulate8080(State8080* state)
             state->sp = state->sp - 2;
             }
             break;
-        case 0xd6: UnimplementedInstruction(state); break;		//  SUI     8bit_data
+        case 0xd6: Arithmetic(state, code[1], SUB, NO_CARRY); state->pc += 1; break;  //  SUI     8bit_data
         case 0xd7:
             //  RST     2
             RST(state, 2);
@@ -471,7 +619,7 @@ int Emulate8080(State8080* state)
             }
             break;
         case 0xdd: UnimplementedInstruction(state); break;		//  NOP
-        case 0xde: UnimplementedInstruction(state); break;		//  SBI     8bit_data
+        case 0xde: Arithmetic(state, code[1], SUB, CARRY); state->pc += 1; break;    //  SBI     8bit_data
         case 0xdf:
             //  RST     3
             RST(state, 3);
@@ -566,7 +714,7 @@ int Emulate8080(State8080* state)
                 state->pc += 2;
             }
             break;
-		case 0xf1:
+		    case 0xf1:
             // Pops PROGRAM STATUS WORD on the stack                POP PSW
             // PSW combines accumulator A and flag register F
             {
@@ -667,8 +815,7 @@ int Emulate8080(State8080* state)
             RST(state, 7);
             break;
 	}
-	// Print out flag condition codes and address data here to keep track of them after each instruction for debugging
-	/*
+
 	printf("\t");
 	printf("%c", state->cc.z ? 'z' : '.');
 	printf("%c", state->cc.s ? 's' : '.');
@@ -677,6 +824,6 @@ int Emulate8080(State8080* state)
 	printf("%c  ", state->cc.ac ? 'a' : '.');
 	printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x\n", state->a, state->b, state->c,
 				state->d, state->e, state->h, state->l, state->sp);
-	*/
+
 	return 0;
 }
