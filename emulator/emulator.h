@@ -381,7 +381,11 @@ int Emulate8080(State8080* state)
         case 0x34: UnimplementedInstruction(state); break;		                  //	INR     M
         case 0x35: UnimplementedInstruction(state); break;		                  //	DCR     M
         case 0x36: UnimplementedInstruction(state); break;		                  //	MVI     M, 8bit_data
-        case 0x37: UnimplementedInstruction(state); break;		                  //	STC
+        case 0x37:
+            //	STC
+            // carry = 1
+            state->cc.cy = 1;
+            break;
         case 0x38: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x39: DAD(state, (uint32_t)state->sp); break;                      //  DAD     SP
         case 0x3a: UnimplementedInstruction(state); break;		                  //	LDA     address
@@ -389,7 +393,11 @@ int Emulate8080(State8080* state)
         case 0x3c: INR(state, &state->a); break;                                //  INR     A
         case 0x3d: DCR(state, &state->a); break;                                //  DCR     A
         case 0x3e: UnimplementedInstruction(state); break;		                  //	MVI     A, 8bit_data
-        case 0x3f: UnimplementedInstruction(state); break;		                  //	CMC
+        case 0x3f:
+            //	CMC
+            // carry = !carry
+            state->cc.cy = !state->cc.cy;
+            break;
         case 0x40: UnimplementedInstruction(state); break;		                  //	MOV     B, B
         case 0x41: UnimplementedInstruction(state); break;		                  //	MOV     B, C
         case 0x42: UnimplementedInstruction(state); break;		                  //	MOV     B, D
