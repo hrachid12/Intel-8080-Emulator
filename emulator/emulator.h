@@ -253,7 +253,14 @@ int Emulate8080(State8080* state)
         case 0x04: INR(state, &state->b); break;                                //  INR     B
         case 0x05: DCR(state, &state->b); break;                                //  DCR     B
         case 0x06: UnimplementedInstruction(state); break;		                  //	MVI     B, 8bit_data
-        case 0x07: UnimplementedInstruction(state); break;	                  	//	RLC
+        case 0x07:
+            // RLC
+            // Rotate accumulator left
+            // 	A = A << 1; bit 0 = prev bit 7; CY = prev bit 7
+            uint8_t temp = state->a;
+            state->a = ((temp & 0x80) >> 7) | (temp << 1);
+            state->cc.cy = (1 == (temp & 0x80));
+            break;
         case 0x08: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x09: DAD(state, (uint32_t)(state->b << 8 | state->c)); break;     //  DAD     BC
         case 0x0a: UnimplementedInstruction(state); break;		                  //	LDAX    B
@@ -268,7 +275,14 @@ int Emulate8080(State8080* state)
         case 0x0c: INR(state, &state->c); break;                                //  INR     C
         case 0x0d: DCR(state, &state->c); break;                                //  DCR     C
         case 0x0e: UnimplementedInstruction(state); break;		                  //  MVI     C, 8bit_data
-        case 0x0f: UnimplementedInstruction(state); break;		                  //	RRC
+        case 0x0f:
+            // RRC
+            // Rotate accumulator right
+            // 	A = A >> 1; bit 7 = prev bit 0; CY = prev bit 0
+            uint8_t temp = state->a;
+            state->a = ((temp & 1) << 7) | (temp >> 1);
+            state->cc.cy = (1 == (temp&1));
+            break;
         case 0x10: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x11: UnimplementedInstruction(state); break;		                  //	LXI     D, 16bit_data
         case 0x12: UnimplementedInstruction(state); break;		                  //	STAX    D
@@ -283,7 +297,14 @@ int Emulate8080(State8080* state)
         case 0x14: INR(state, &state->d); break;                                //  INR     D
         case 0x15: DCR(state, &state->d); break;                                //  DCR     D
         case 0x16: UnimplementedInstruction(state); break;		                  //	MVI     D, 8bit_data
-        case 0x17: UnimplementedInstruction(state); break;		                  //	RAL
+        case 0x17:
+            // RAL
+            // Rotate accumulator left through carry
+            // A = A << 1; bit 0 = prev CY; CY = prev bit 7
+            uint8_t temp = state->a;
+            state->a = state->cc.cy | (temp << 1);
+            state->cc.cy = (0x80 == (temp & 0x80));
+            break;
         case 0x18: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x19: DAD(state, (uint32_t)(state->d << 8 | state->e)); break;     //  DAD     DE
         case 0x1a: UnimplementedInstruction(state); break;		                  //	LDAX    D
@@ -298,7 +319,14 @@ int Emulate8080(State8080* state)
         case 0x1c: INR(state, &state->e); break;                                //  INR     E
         case 0x1d: DCR(state, &state->e); break;                                //  DCR     E
         case 0x1e: UnimplementedInstruction(state); break;		                  //	MVI     E, 8bit_data
-        case 0x1f: UnimplementedInstruction(state); break;		                  //	RAR
+        case 0x1f:
+            // RAR
+            // Rotate accumulator right through carry
+            // A = A >> 1; bit 7 = prev bit 7; CY = prev bit 0
+            uint8_t temp = state->a;
+            state->a = (state->cc.cy << 7) | (temp >> 1);
+            state->cc.cy = (1 == (temp & 1));
+            break;
         case 0x20: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x21: UnimplementedInstruction(state); break;		                  //	LXI     H, 16bit_data
         case 0x22: UnimplementedInstruction(state); break;		                  //	SHLD    address
