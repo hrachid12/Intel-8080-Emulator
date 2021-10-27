@@ -256,7 +256,7 @@ int Emulate8080(State8080* state)
 	state->pc += 1;													// inc pc by 1
 
 	switch(*code) {
-				case 0x00: UnimplementedInstruction(state); break;		                  //	NOP
+	    case 0x00: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x01: UnimplementedInstruction(state); break;		                  //  LXI     B, 16bit_data
         case 0x02: UnimplementedInstruction(state); break;		                  //	STAX    B
         case 0x03:                                                              //	INX     BC
