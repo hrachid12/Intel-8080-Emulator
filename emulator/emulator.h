@@ -189,7 +189,7 @@ void AND(State8080* state, uint8_t reg) {
     // Logical AND reg with the accumulator
     // Value is stored in the accumulator
     state->a = state->a & reg;
-    HandleZSP_Flags(state, state->a)
+    HandleZSP_Flags(state, state->a);
 
     // Resets carry bit to zero
     state->cc.cy = 0;
@@ -229,7 +229,6 @@ void CMP(State8080* state, uint8_t reg) {
     // Handle carry flag
     if (result > 0xff) { state->cc.cy = 1; }
     else { state->cc.cy = 0; }
-    if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
 }
 
 void POP(State8080 *state, char pop) {
@@ -1061,7 +1060,11 @@ int Emulate8080(State8080* state)
                       PUSH(state, 'H');
                   }
                   break;
-        case 0xe6: UnimplementedInstruction(state); break;		//  ANI     8bit_data
+        case 0xe6:
+                  // ANI 8bit_data
+                  // A <- A & data
+                  AND(state, code[1]);
+                  break;
         case 0xe7:
                   //  RST     4
                   RST(state, 4);
@@ -1083,7 +1086,18 @@ int Emulate8080(State8080* state)
                       state->pc += 2;
                   }
                   break;
-        case 0xeb: UnimplementedInstruction(state); break;		//  XCHG
+        case 0xeb:
+                  //  XCHG
+                  // Exchange the data in the H and D registers
+                  // and in the L and E registers
+                  uint8_t temp1 = state->h;
+                  uint8_t temp2 = state->l;
+
+                  state->h = state->d;
+                  state->l = state->e;
+                  state->d = temp1;
+                  state->e = temp2;
+                  break;
         case 0xec:
                   //  CPE     address
                   if (1 == state->cc.p) {
@@ -1174,8 +1188,11 @@ int Emulate8080(State8080* state)
                       state->pc += 2;
                   }
                   break;
-        case 0xfd: break;		                                  //  NOP
-        case 0xfe: UnimplementedInstruction(state); break;		//  CPI     8bit_data
+        case 0xfd: break; //  NOP
+        case 0xfe:
+                  // CPI 8bit_data
+                  CMP(state, code[1]);
+                  break;
         case 0xff:
                   //  RST     7
                   RST(state, 7);
