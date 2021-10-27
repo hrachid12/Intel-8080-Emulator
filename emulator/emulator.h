@@ -230,6 +230,23 @@ void ORA(State8080* state, uint8_t reg) {
     state->cc.cy = 0;
 }
 
+void CMP(State8080* state, uint8_t reg) {
+    // Compares the specified register to the accumulator
+    // Sets condition bits based on the result of the comparison
+
+    // Subtraction logic taken from Arithmetic helper function
+    // add two's complement of the operand for subtraction
+    uint8_t result = state->a + (uint8_t)(~reg + 1);
+
+    // Handle Zero, Sign, and Parity flags
+    HandleZSP_Flags(state, result);
+
+    // Handle carry flag
+    if (result > 0xff) { state->cc.cy = 1; }
+    else { state->cc.cy = 0; }
+    if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
+}
+
 int Emulate8080(State8080* state)
 {
 	unsigned char *code = &state->memory[state->pc];
@@ -579,14 +596,35 @@ int Emulate8080(State8080* state)
             // A <- A | A
             ORA(state, state->a);
             break;
-        case 0xb8: UnimplementedInstruction(state); break;		//  CMP     B
-        case 0xb9: UnimplementedInstruction(state); break;		//  CMP     C
-        case 0xba: UnimplementedInstruction(state); break;		//  CMP     D
-        case 0xbb: UnimplementedInstruction(state); break;		//  CMP     E
-        case 0xbc: UnimplementedInstruction(state); break;		//  CMP     H
-        case 0xbd: UnimplementedInstruction(state); break;		//  CMP     L
+        case 0xb8:
+            //  CMP B
+            CMP(state, state->b);
+            break;
+        case 0xb9:
+            //  CMP C
+            CMP(state, state->c);
+            break;
+        case 0xba:
+            //  CMP D
+            CMP(state, state->d);
+            break;
+        case 0xbb:
+            //  CMP E
+            CMP(state, state->e);
+            break;
+        case 0xbc:
+            //  CMP H
+            CMP(state, state->h);
+            break;
+        case 0xbd:
+            //  CMP L
+            CMP(state, state->l);
+            break;
         case 0xbe: UnimplementedInstruction(state); break;		//  CMP     M
-        case 0xbf: UnimplementedInstruction(state); break;		//  CMP     A
+        case 0xbf:
+            //  CMP A
+            CMP(state, state->a);
+            break;
         case 0xc0:
             //  RNZ
             if (0 == state->cc.z) {
