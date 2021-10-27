@@ -96,7 +96,7 @@ void Arithmetic(State8080* state, uint8_t operand, uint8_t operation, uint8_t ca
   // Handle carry flag
   if (result > 0xff) { state->cc.cy = 1; }
   else { state->cc.cy = 0; }
-  if (operation == 1) { state->cc.cy ^= 1; }  // carry works opposite in subtraction, so flip bit
+  if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
 
   // Store result in A
   state->a = (result & 0xff);
@@ -145,14 +145,14 @@ void UnimplementedInstruction(State8080* state)
 	exit(1);
 }
 
-void JMP (State8080* state, char *code) {
+void JMP (State8080* state, unsigned char* code) {
     // Create 16bit address from the opcodes
     // Left shift larger byte due to format being little endian
     // Jump to the 16bit address
     state->pc = (code[2] << 8) | code[1];
 }
 
-void CALL (State8080* state, char *code) {
+void CALL (State8080* state, unsigned char* code) {
     uint16_t ret = state->pc+2;
 
     //Save upper byte
@@ -170,7 +170,7 @@ void CALL (State8080* state, char *code) {
     state->pc = (code[2] << 8) | code[1];
 }
 
-void RST (State8080* state, char* num) {
+void RST (State8080* state, uint8_t num) {
     uint16_t ret = state->pc+2;
 
     //Save upper byte
@@ -200,6 +200,18 @@ void RET(State8080* state) {
     state->sp += 2;
 }
 
+void AND(State8080* state, uint8_t reg) {
+    // Logical AND reg with the accumulator
+    // Value is stored in the accumulator
+    uint8_t  result;
+    result = state->a & reg;
+    HandleZSP_Flags(state, result);
+
+    // Resets carry bit to zero
+    state->cc.cy = 0;
+
+    state->a = result;
+}
 
 int Emulate8080(State8080* state)
 {
@@ -215,7 +227,7 @@ int Emulate8080(State8080* state)
         case 0x02: UnimplementedInstruction(state); break;		                  //	STAX    B
         case 0x03:                                                              //	INX     BC
                   {
-                    state->c += 0x01; 
+                    state->c += 0x01;
                     if ((state->c & 0xff) == 0){
                       state->b += 0x01;
                     }
@@ -414,7 +426,11 @@ int Emulate8080(State8080* state)
         case 0x9d: Arithmetic(state, state->l, SUB, CARRY);	break;		          //	SBB     L
         case 0x9e: UnimplementedInstruction(state); break;		                  //	SBB     M
         case 0x9f: Arithmetic(state, state->a, SUB, CARRY);	break;		          //	SBB     A
-        case 0xa0: UnimplementedInstruction(state); break;		                  //	ANA     B
+        case 0xa0:
+            // ANA B
+            // A <- A & B
+            AND(state, state->b);
+            break;
         case 0xa1: UnimplementedInstruction(state); break;		                  //	ANA     C
         case 0xa2: UnimplementedInstruction(state); break;		                  //	ANA     D
         case 0xa3: UnimplementedInstruction(state); break;		                  //	ANA     E
@@ -816,14 +832,14 @@ int Emulate8080(State8080* state)
             break;
 	}
 
-	printf("\t");
-	printf("%c", state->cc.z ? 'z' : '.');
-	printf("%c", state->cc.s ? 's' : '.');
-	printf("%c", state->cc.p ? 'p' : '.');
-	printf("%c", state->cc.cy ? 'c' : '.');
-	printf("%c  ", state->cc.ac ? 'a' : '.');
-	printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x\n", state->a, state->b, state->c,
-				state->d, state->e, state->h, state->l, state->sp);
+//	printf("\t");
+//	printf("%c", state->cc.z ? 'z' : '.');
+//	printf("%c", state->cc.s ? 's' : '.');
+//	printf("%c", state->cc.p ? 'p' : '.');
+//	printf("%c", state->cc.cy ? 'c' : '.');
+//	printf("%c  ", state->cc.ac ? 'a' : '.');
+//	printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x\n", state->a, state->b, state->c,
+//				state->d, state->e, state->h, state->l, state->sp);
 
 	return 0;
 }
