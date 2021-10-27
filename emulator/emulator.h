@@ -35,110 +35,100 @@ typedef struct State8080 {
 	uint8_t		int_enable;
 } State8080;
 
-int ParityCheck(uint8_t value)
-{
-  // Checks if passed value has even or odd parity
-  uint8_t count = 0;
-  uint8_t check = 0x01;
-  for (int i = 0; i < 8; i++)
-  {
-    if(value & check){count += 1;}
-    check = check << 1;
-  }
-  // 8080 sets with even parity
-  if (count % 2 == 0)
-  {
-    return 1;
-  }
-  return 0;
+int ParityCheck(uint8_t value) {
+    // Checks if passed value has even or odd parity
+    uint8_t count = 0;
+    uint8_t check = 0x01;
+
+    for (int i = 0; i < 8; i++) {
+        if(value & check){count += 1;}
+        check = check << 1;
+    }
+
+    // 8080 sets with even parity
+    if (count % 2 == 0) {
+        return 1;
+    }
+    return 0;
 }
 
-void HandleZSP_Flags(State8080* state, uint16_t result)
-{
-  // Handle zero flag
-  if ((result & 0xff) == 0) { state->cc.z = 1; }
-  else { state->cc.z = 0; }
+void HandleZSP_Flags(State8080* state, uint16_t result) {
+    // Handle zero flag
+    if ((result & 0xff) == 0) { state->cc.z = 1; }
+    else { state->cc.z = 0; }
 
-  // Handle sign flag
-  if (result & 0x80) { state->cc.s = 1; }
-  else { state->cc.s = 0; }
+    // Handle sign flag
+    if (result & 0x80) { state->cc.s = 1; }
+    else { state->cc.s = 0; }
 
-  // Handle parity flag
-  state->cc.p = ParityCheck(result & 0xff);
-  return;
+    // Handle parity flag
+    state->cc.p = ParityCheck(result & 0xff);
+    return;
 }
 
-void Arithmetic(State8080* state, uint8_t operand, uint8_t operation, uint8_t carry)
-{
-  // Handles ADD, ADI, ADC, ACI, SUB, SUI, SBB, SBI instructions
-  uint16_t result;
-  // Handle operations that use carry bit
-  if (carry)
-  {
-    operand += state->cc.cy;
-  }
+void Arithmetic(State8080* state, uint8_t operand, uint8_t operation, uint8_t carry) {
+    // Handles ADD, ADI, ADC, ACI, SUB, SUI, SBB, SBI instructions
+    uint16_t result;
+    // Handle operations that use carry bit
+    if (carry) {
+        operand += state->cc.cy;
+    }
 
-  // Addition
-  if (operation == ADD)
-  {
-    result = state->a + operand;
-  }
-  // Subtraction
-  else if (operation == SUB)
-  {
-    result = state->a + (uint8_t)(~operand + 1); // add two's complement of the operand
-  }
+    // Addition
+    if (operation == ADD) {
+        result = state->a + operand;
+    }
+    // Subtraction
+    else if (operation == SUB) {
+        result = state->a + (uint8_t)(~operand + 1); // add two's complement of the operand
+    }
 
-  // Handle Zero, Sign, and Parity flags
-  HandleZSP_Flags(state, result);
+    // Handle Zero, Sign, and Parity flags
+    HandleZSP_Flags(state, result);
 
-  // Handle carry flag
-  if (result > 0xff) { state->cc.cy = 1; }
-  else { state->cc.cy = 0; }
-  if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
+    // Handle carry flag
+    if (result > 0xff) { state->cc.cy = 1; }
+    else { state->cc.cy = 0; }
+    if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
 
-  // Store result in A
-  state->a = (result & 0xff);
-  return;
+    // Store result in A
+    state->a = (result & 0xff);
+    return;
 }
 
-void DAD(State8080 *state, uint32_t reg_pair)
-{
-  // Add register pair to HL (16 bit add)
-  uint32_t hl = (state->h << 8 | state->l);
-  uint32_t result = reg_pair += hl;
+void DAD(State8080 *state, uint32_t reg_pair) {
+    // Add register pair to HL (16 bit add)
+    uint32_t hl = (state->h << 8 | state->l);
+    uint32_t result = reg_pair += hl;
 
-  // Handle carry flag
-  if (result & 0x10000) { state->cc.cy = 1; }
-  else { state->cc.cy = 0; }
-  
-  // Store results back in h and l
-  state->l = (uint8_t)result & 0xff;
-  state->h = (uint8_t)(result >> 8) & 0xff;
-  return;
+    // Handle carry flag
+    if (result & 0x10000) { state->cc.cy = 1; }
+    else { state->cc.cy = 0; }
+
+    // Store results back in h and l
+    state->l = (uint8_t)result & 0xff;
+    state->h = (uint8_t)(result >> 8) & 0xff;
+    return;
 }
 
-void INR(State8080 *state, uint8_t *reg)
-{
-  // Increments register and handles flags
-  *reg += 0x01;
-  HandleZSP_Flags(state, *reg);
-  return;
+void INR(State8080 *state, uint8_t *reg) {
+    // Increments register and handles flags
+    *reg += 0x01;
+    HandleZSP_Flags(state, *reg);
+    return;
 }
 
-void DCR(State8080 *state, uint8_t *reg)
-{
-  // Decrements register and handles flags
-  *reg -= 0x01;
-  HandleZSP_Flags(state, *reg);
-  return;
+void DCR(State8080 *state, uint8_t *reg) {
+    // Decrements register and handles flags
+    *reg -= 0x01;
+    HandleZSP_Flags(state, *reg);
+    return;
 }
 
-void MOV(uint8_t *reg, uint8_t value)
-{
-  // Moves a value into a specified register
-  *reg = value;
-  return;
+void MOV(uint8_t *reg, uint8_t value) {
+    // Moves a value into a specified register
+    *reg = value;
+    return;
 }
 
 void JMP (State8080* state, unsigned char* code) {
@@ -185,7 +175,6 @@ void RST (State8080* state, uint8_t num) {
     state->pc = (num << 3) | 0x0000;
 }
 
-
 void RET(State8080* state) {
     // Set pc to the 16bit address taken from the stack
     // Left shift the upper byte and use inclusive OR to create the
@@ -196,21 +185,11 @@ void RET(State8080* state) {
     state->sp += 2;
 }
 
-void UnimplementedInstruction(State8080* state)
-{
-	// Print error along with associated instruction
-	printf ("Error: Unimplemented instruction\n");
-	state->pc--;
-	Disassembler(state->memory, state->pc);
-	printf("\n");
-	exit(1);
-}
-
 void AND(State8080* state, uint8_t reg) {
     // Logical AND reg with the accumulator
     // Value is stored in the accumulator
     state->a = state->a & reg;
-    HandleZSP_Flags(state, state->a)
+    HandleZSP_Flags(state, state->a);
 
     // Resets carry bit to zero
     state->cc.cy = 0;
@@ -250,104 +229,94 @@ void CMP(State8080* state, uint8_t reg) {
     // Handle carry flag
     if (result > 0xff) { state->cc.cy = 1; }
     else { state->cc.cy = 0; }
-    if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
 }
 
-void POP(State8080 *state, char pop)
-{
- // Addition
-  if (pop == 'B')
-  {
-    // Pop B and C from stack
-    state->c = state->memory[state->sp];
-    state->b = state->memory[state->sp+1];
-    // Increment pointer
-    state->sp += 2;
-  }
-  else if (pop == 'D')
-  {
-    // Pop D and E from stack
-    state->e = state->memory[state->sp];
-    state->d = state->memory[state->sp+1];
-    // Increment pointer
-    state->sp += 2;
-  }
-  else if (pop == 'H')
-  {
-    // Pop H and L from stack
-    state->l = state->memory[state->sp];
-    state->h = state->memory[state->sp+1];
-    // Increment counter
-    state->sp += 2;
-  }
-    else if (pop == 'P')
-  {
-    // Copy memory content into accumulator A
-    state->a = state->memory[state->sp+1];
-    // Set psw variable by copying memory
-    // content on top of stack. This is
-    // for flag register F.
-    uint8_t psw = state->memory[state->sp];
-    // Sets state cc struct values if equal
-    // to bitwise AND operation
-    state->cc.z  = (0x01 == (psw & 0x01));
-    state->cc.s  = (0x02 == (psw & 0x02));
-    state->cc.p  = (0x04 == (psw & 0x04));
-    state->cc.cy = (0x05 == (psw & 0x08));
-    state->cc.ac = (0x10 == (psw & 0x10));
-    // Increment pointer
-    state->sp += 2;
-  }
+void POP(State8080 *state, char pop) {
+    // Addition
+    if (pop == 'B') {
+        // Pop B and C from stack
+        state->c = state->memory[state->sp];
+        state->b = state->memory[state->sp+1];
+        // Increment pointer
+        state->sp += 2;
+    } else if (pop == 'D') {
+        // Pop D and E from stack
+        state->e = state->memory[state->sp];
+        state->d = state->memory[state->sp+1];
+        // Increment pointer
+        state->sp += 2;
+    } else if (pop == 'H') {
+        // Pop H and L from stack
+        state->l = state->memory[state->sp];
+        state->h = state->memory[state->sp+1];
+        // Increment counter
+        state->sp += 2;
+    } else if (pop == 'P') {
+        // Copy memory content into accumulator A
+        state->a = state->memory[state->sp+1];
+        // Set psw variable by copying memory
+        // content on top of stack. This is
+        // for flag register F.
+        uint8_t psw = state->memory[state->sp];
+        // Sets state cc struct values if equal
+        // to bitwise AND operation
+        state->cc.z  = (0x01 == (psw & 0x01));
+        state->cc.s  = (0x02 == (psw & 0x02));
+        state->cc.p  = (0x04 == (psw & 0x04));
+        state->cc.cy = (0x05 == (psw & 0x08));
+        state->cc.ac = (0x10 == (psw & 0x10));
+        // Increment pointer
+        state->sp += 2;
+    }
 }
 
-void PUSH(State8080 *state, char push)
-{
- // Addition
-  if (push == 'B')
-  {
-    // Push B and C onto stack
-    state->memory[state->sp-1] = state->b;
-    state->memory[state->sp-2] = state->c;
-    // Decrement pointer
-    state->sp = state->sp - 2;
-  }
-  else if (push == 'D')
-  {
-    // Push D and E onto stack
-    state->memory[state->sp-1] = state->d;
-    state->memory[state->sp-2] = state->e;
-    // Decrement pointer
-    state->sp = state->sp - 2;
-  }
-  else if (push == 'H')
-  {
-    // Push H and L onto stack
-    state->memory[state->sp-1] = state->h;
-    state->memory[state->sp-2] = state->l;
-    // Decrement pointer
-    state->sp = state->sp - 2;
-  }
-    else if (push == 'P')
-  {
-    // Push accumulator A onto stack
-    state->memory[state->sp-1] = state->a;
-    // Create and set psw int variable by
-    // combining flag register F contained
-    // in state cc struct
-    uint8_t psw = (state->cc.z |
-            state->cc.s << 1 |
-            state->cc.p << 2 |
-            state->cc.cy << 3 |
-            state->cc.ac << 4 );
-    // Push psw onto stack and decrement pointer
-    state->memory[state->sp-2] = psw;
-    state->sp = state->sp - 2;
-  }
-
+void PUSH(State8080 *state, char push) {
+    // Addition
+    if (push == 'B') {
+        // Push B and C onto stack
+        state->memory[state->sp-1] = state->b;
+        state->memory[state->sp-2] = state->c;
+        // Decrement pointer
+        state->sp = state->sp - 2;
+    } else if (push == 'D') {
+        // Push D and E onto stack
+        state->memory[state->sp-1] = state->d;
+        state->memory[state->sp-2] = state->e;
+        // Decrement pointer
+        state->sp = state->sp - 2;
+    } else if (push == 'H') {
+        // Push H and L onto stack
+        state->memory[state->sp-1] = state->h;
+        state->memory[state->sp-2] = state->l;
+        // Decrement pointer
+        state->sp = state->sp - 2;
+    } else if (push == 'P') {
+        // Push accumulator A onto stack
+        state->memory[state->sp-1] = state->a;
+        // Create and set psw int variable by
+        // combining flag register F contained
+        // in state cc struct
+        uint8_t psw = (state->cc.z |
+                state->cc.s << 1 |
+                state->cc.p << 2 |
+                state->cc.cy << 3 |
+                state->cc.ac << 4 );
+        // Push psw onto stack and decrement pointer
+        state->memory[state->sp-2] = psw;
+        state->sp = state->sp - 2;
+    }
 }
 
-int Emulate8080(State8080* state)
-{
+void UnimplementedInstruction(State8080* state) {
+    // Print error along with associated instruction
+    printf ("Error: Unimplemented instruction\n");
+    state->pc--;
+    Disassembler(state->memory, state->pc);
+    printf("\n");
+    exit(1);
+}
+
+int Emulate8080(State8080* state) {
 	unsigned char *code = &state->memory[state->pc];
 
 	Disassembler(state->memory, state->pc);
@@ -355,7 +324,7 @@ int Emulate8080(State8080* state)
 	state->pc += 1;				// inc pc by 1 since every instruction takes at least 1 byte
 
 	switch(*code) {
-				case 0x00: break;		                                                    //	NOP
+	    case 0x00: break;		                                                    //	NOP
         case 0x01:                                                              //  LXI     BC, 16bit_data
                   {
                     state->b = code[2];
@@ -382,12 +351,14 @@ int Emulate8080(State8080* state)
         case 0x05: DCR(state, &state->b); break;                                //  DCR     B
         case 0x06: MOV(&state->b, code[1]); state->pc += 1; break;              //	MVI     B, 8bit_data
         case 0x07:                                        	                  	//	RLC
-                  // Rotate accumulator left
-                  // 	A = A << 1; bit 0 = prev bit 7; CY = prev bit 7
-                  uint8_t temp = state->a;
-                  state->a = ((temp & 0x80) >> 7) | (temp << 1);
-                  state->cc.cy = (1 == (temp & 0x80));
-                  break;
+                {
+                    // Rotate accumulator left
+                    // 	A = A << 1; bit 0 = prev bit 7; CY = prev bit 7
+                    uint8_t temp = state->a;
+                    state->a = ((temp & 0x80) >> 7) | (temp << 1);
+                    state->cc.cy = (1 == (temp & 0x80));
+                    break;
+                }
         case 0x08: break;		                                                    //	NOP
         case 0x09: DAD(state, (uint32_t)(state->b << 8 | state->c)); break;     //  DAD     BC
         case 0x0a:                                                              //	LDAX    BC
@@ -409,12 +380,15 @@ int Emulate8080(State8080* state)
         case 0x0d: DCR(state, &state->c); break;                                //  DCR     C
         case 0x0e: MOV(&state->c, code[1]); state->pc += 1; break;              //  MVI     C, 8bit_data
         case 0x0f:                                         		                  //	RRC
-                  // Rotate accumulator right
-                  // 	A = A >> 1; bit 7 = prev bit 0; CY = prev bit 0
-                  uint8_t temp = state->a;
-                  state->a = ((temp & 1) << 7) | (temp >> 1);
-                  state->cc.cy = (1 == (temp&1));
-                  break;
+                {
+                    // Rotate accumulator right
+                    // 	A = A >> 1; bit 7 = prev bit 0; CY = prev bit 0
+                    uint8_t temp;
+                    temp = state->a;
+                    state->a = ((temp & 1) << 7) | (temp >> 1);
+                    state->cc.cy = (1 == (temp & 1));
+                    break;
+                }
         case 0x10: break;		                                                    //	NOP
         case 0x11:                                                              //  LXI     D, 16bit_data
                   {
@@ -442,13 +416,15 @@ int Emulate8080(State8080* state)
         case 0x15: DCR(state, &state->d); break;                                //  DCR     D
         case 0x16: MOV(&state->d, code[1]); state->pc += 1; break;		          //	MVI     D, 8bit_data
         case 0x17:                                        		                  //	RAL
-                  // RAL
-                  // Rotate accumulator left through carry
-                  // A = A << 1; bit 0 = prev CY; CY = prev bit 7
-                  uint8_t temp = state->a;
-                  state->a = state->cc.cy | (temp << 1);
-                  state->cc.cy = (0x80 == (temp & 0x80));
-                  break;
+                {
+                    // RAL
+                    // Rotate accumulator left through carry
+                    // A = A << 1; bit 0 = prev CY; CY = prev bit 7
+                    uint8_t temp = state->a;
+                    state->a = state->cc.cy | (temp << 1);
+                    state->cc.cy = (0x80 == (temp & 0x80));
+                    break;
+                }
         case 0x18: break;		                                                    //	NOP
         case 0x19: DAD(state, (uint32_t)(state->d << 8 | state->e)); break;     //  DAD     DE
         case 0x1a:                                          	                  //	LDAX    DE
@@ -470,12 +446,14 @@ int Emulate8080(State8080* state)
         case 0x1d: DCR(state, &state->e); break;                                //  DCR     E
         case 0x1e: MOV(&state->e, code[1]); state->pc += 1; break;		          //	MVI     E, 8bit_data
         case 0x1f:                                        		                  //	RAR
-                  // Rotate accumulator right through carry
-                  // A = A >> 1; bit 7 = prev bit 7; CY = prev bit 0
-                  uint8_t temp = state->a;
-                  state->a = (state->cc.cy << 7) | (temp >> 1);
-                  state->cc.cy = (1 == (temp & 1));
-                  break;
+                {
+                    // Rotate accumulator right through carry
+                    // A = A >> 1; bit 7 = prev bit 7; CY = prev bit 0
+                    uint8_t temp = state->a;
+                    state->a = (state->cc.cy << 7) | (temp >> 1);
+                    state->cc.cy = (1 == (temp & 1));
+                    break;
+                }
         case 0x20: break;		                                                    //	NOP
         case 0x21:                                                              //  LXI     H, 16bit_data
                   {
@@ -1085,12 +1063,16 @@ int Emulate8080(State8080* state)
                   }
                   break;
         case 0xe5: 						
-                  / /Puts a register pair on the stack                   PUSH   H
+                  //Puts a register pair on the stack                   PUSH   H
                   {
                       PUSH(state, 'H');
                   }
                   break;
-        case 0xe6: UnimplementedInstruction(state); break;		//  ANI     8bit_data
+        case 0xe6:
+                  // ANI 8bit_data
+                  // A <- A & data
+                  AND(state, code[1]);
+                  break;
         case 0xe7:
                   //  RST     4
                   RST(state, 4);
@@ -1112,7 +1094,20 @@ int Emulate8080(State8080* state)
                       state->pc += 2;
                   }
                   break;
-        case 0xeb: UnimplementedInstruction(state); break;		//  XCHG
+        case 0xeb:
+                {
+                    //  XCHG
+                    // Exchange the data in the H and D registers
+                    // and in the L and E registers
+                    uint8_t temp1 = state->h;
+                    uint8_t temp2 = state->l;
+
+                    state->h = state->d;
+                    state->l = state->e;
+                    state->d = temp1;
+                    state->e = temp2;
+                    break;
+                }
         case 0xec:
                   //  CPE     address
                   if (1 == state->cc.p) {
@@ -1203,22 +1198,16 @@ int Emulate8080(State8080* state)
                       state->pc += 2;
                   }
                   break;
-        case 0xfd: break;		                                  //  NOP
-        case 0xfe: UnimplementedInstruction(state); break;		//  CPI     8bit_data
+        case 0xfd: break; //  NOP
+        case 0xfe:
+                  // CPI 8bit_data
+                  CMP(state, code[1]);
+                  break;
         case 0xff:
                   //  RST     7
                   RST(state, 7);
                   break;
 	}
-
-//	printf("\t");
-//	printf("%c", state->cc.z ? 'z' : '.');
-//	printf("%c", state->cc.s ? 's' : '.');
-//	printf("%c", state->cc.p ? 'p' : '.');
-//	printf("%c", state->cc.cy ? 'c' : '.');
-//	printf("%c  ", state->cc.ac ? 'a' : '.');
-//	printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x\n", state->a, state->b, state->c,
-//				state->d, state->e, state->h, state->l, state->sp);
 
 	return 0;
 }
