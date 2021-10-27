@@ -96,7 +96,7 @@ void Arithmetic(State8080* state, uint8_t operand, uint8_t operation, uint8_t ca
   // Handle carry flag
   if (result > 0xff) { state->cc.cy = 1; }
   else { state->cc.cy = 0; }
-  if (operation == 1) { state->cc.cy ^= 1; }  // carry works opposite in subtraction, so flip bit
+  if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
 
   // Store result in A
   state->a = (result & 0xff);
@@ -145,14 +145,14 @@ void UnimplementedInstruction(State8080* state)
 	exit(1);
 }
 
-void JMP (State8080* state, char *code) {
+void JMP (State8080* state, unsigned char* code) {
     // Create 16bit address from the opcodes
     // Left shift larger byte due to format being little endian
     // Jump to the 16bit address
     state->pc = (code[2] << 8) | code[1];
 }
 
-void CALL (State8080* state, char *code) {
+void CALL (State8080* state, unsigned char* code) {
     uint16_t ret = state->pc+2;
 
     //Save upper byte
@@ -170,7 +170,7 @@ void CALL (State8080* state, char *code) {
     state->pc = (code[2] << 8) | code[1];
 }
 
-void RST (State8080* state, char* num) {
+void RST (State8080* state, uint8_t num) {
     uint16_t ret = state->pc+2;
 
     //Save upper byte
@@ -198,6 +198,54 @@ void RET(State8080* state) {
 
     // Increment stack pointer
     state->sp += 2;
+}
+
+
+void AND(State8080* state, uint8_t reg) {
+    // Logical AND reg with the accumulator
+    // Value is stored in the accumulator
+    state->a = state->a & reg;
+    HandleZSP_Flags(state, state->a)
+
+    // Resets carry bit to zero
+    state->cc.cy = 0;
+}
+
+void XOR(State8080* state, uint8_t reg) {
+    // Exclusive OR between reg and accumulator
+    // Value stored in accumulator
+    state->a = state->a ^ reg;
+    HandleZSP_Flags(state, state->a);
+
+    // Resets carry bit to zero
+    state->cc.cy = 0;
+}
+
+void ORA(State8080* state, uint8_t reg) {
+    // Inclusive OR between reg and accumulator
+    // Value stored in accumulator
+    state->a = state->a | reg;
+    HandleZSP_Flags(state, state->a);
+
+    // Resets carry bit to zero
+    state->cc.cy = 0;
+}
+
+void CMP(State8080* state, uint8_t reg) {
+    // Compares the specified register to the accumulator
+    // Sets condition bits based on the result of the comparison
+
+    // Subtraction logic taken from Arithmetic helper function
+    // add two's complement of the operand for subtraction
+    uint8_t result = state->a + (uint8_t)(~reg + 1);
+
+    // Handle Zero, Sign, and Parity flags
+    HandleZSP_Flags(state, result);
+
+    // Handle carry flag
+    if (result > 0xff) { state->cc.cy = 1; }
+    else { state->cc.cy = 0; }
+    if (operation == 1) { state->cc.cy = 1; }  // carry works opposite in subtraction, so flip bit
 }
 
 void POP(State8080 *state, char pop)
@@ -290,6 +338,7 @@ void PUSH(State8080 *state, char push)
     state->memory[state->sp-2] = psw;
     state->sp = state->sp - 2;
   }
+
 }
 
 int Emulate8080(State8080* state)
@@ -301,12 +350,12 @@ int Emulate8080(State8080* state)
 	state->pc += 1;													// inc pc by 1
 
 	switch(*code) {
-				case 0x00: UnimplementedInstruction(state); break;		                  //	NOP
+	    case 0x00: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x01: UnimplementedInstruction(state); break;		                  //  LXI     B, 16bit_data
         case 0x02: UnimplementedInstruction(state); break;		                  //	STAX    B
         case 0x03:                                                              //	INX     BC
                   {
-                    state->c += 0x01; 
+                    state->c += 0x01;
                     if ((state->c & 0xff) == 0){
                       state->b += 0x01;
                     }
@@ -315,7 +364,14 @@ int Emulate8080(State8080* state)
         case 0x04: INR(state, &state->b); break;                                //  INR     B
         case 0x05: DCR(state, &state->b); break;                                //  DCR     B
         case 0x06: UnimplementedInstruction(state); break;		                  //	MVI     B, 8bit_data
-        case 0x07: UnimplementedInstruction(state); break;	                  	//	RLC
+        case 0x07:
+            // RLC
+            // Rotate accumulator left
+            // 	A = A << 1; bit 0 = prev bit 7; CY = prev bit 7
+            uint8_t temp = state->a;
+            state->a = ((temp & 0x80) >> 7) | (temp << 1);
+            state->cc.cy = (1 == (temp & 0x80));
+            break;
         case 0x08: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x09: DAD(state, (uint32_t)(state->b << 8 | state->c)); break;     //  DAD     BC
         case 0x0a: UnimplementedInstruction(state); break;		                  //	LDAX    B
@@ -330,7 +386,14 @@ int Emulate8080(State8080* state)
         case 0x0c: INR(state, &state->c); break;                                //  INR     C
         case 0x0d: DCR(state, &state->c); break;                                //  DCR     C
         case 0x0e: UnimplementedInstruction(state); break;		                  //  MVI     C, 8bit_data
-        case 0x0f: UnimplementedInstruction(state); break;		                  //	RRC
+        case 0x0f:
+            // RRC
+            // Rotate accumulator right
+            // 	A = A >> 1; bit 7 = prev bit 0; CY = prev bit 0
+            uint8_t temp = state->a;
+            state->a = ((temp & 1) << 7) | (temp >> 1);
+            state->cc.cy = (1 == (temp&1));
+            break;
         case 0x10: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x11: UnimplementedInstruction(state); break;		                  //	LXI     D, 16bit_data
         case 0x12: UnimplementedInstruction(state); break;		                  //	STAX    D
@@ -345,7 +408,14 @@ int Emulate8080(State8080* state)
         case 0x14: INR(state, &state->d); break;                                //  INR     D
         case 0x15: DCR(state, &state->d); break;                                //  DCR     D
         case 0x16: UnimplementedInstruction(state); break;		                  //	MVI     D, 8bit_data
-        case 0x17: UnimplementedInstruction(state); break;		                  //	RAL
+        case 0x17:
+            // RAL
+            // Rotate accumulator left through carry
+            // A = A << 1; bit 0 = prev CY; CY = prev bit 7
+            uint8_t temp = state->a;
+            state->a = state->cc.cy | (temp << 1);
+            state->cc.cy = (0x80 == (temp & 0x80));
+            break;
         case 0x18: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x19: DAD(state, (uint32_t)(state->d << 8 | state->e)); break;     //  DAD     DE
         case 0x1a: UnimplementedInstruction(state); break;		                  //	LDAX    D
@@ -360,7 +430,14 @@ int Emulate8080(State8080* state)
         case 0x1c: INR(state, &state->e); break;                                //  INR     E
         case 0x1d: DCR(state, &state->e); break;                                //  DCR     E
         case 0x1e: UnimplementedInstruction(state); break;		                  //	MVI     E, 8bit_data
-        case 0x1f: UnimplementedInstruction(state); break;		                  //	RAR
+        case 0x1f:
+            // RAR
+            // Rotate accumulator right through carry
+            // A = A >> 1; bit 7 = prev bit 7; CY = prev bit 0
+            uint8_t temp = state->a;
+            state->a = (state->cc.cy << 7) | (temp >> 1);
+            state->cc.cy = (1 == (temp & 1));
+            break;
         case 0x20: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x21: UnimplementedInstruction(state); break;		                  //	LXI     H, 16bit_data
         case 0x22: UnimplementedInstruction(state); break;		                  //	SHLD    address
@@ -398,7 +475,11 @@ int Emulate8080(State8080* state)
         case 0x34: UnimplementedInstruction(state); break;		                  //	INR     M
         case 0x35: UnimplementedInstruction(state); break;		                  //	DCR     M
         case 0x36: UnimplementedInstruction(state); break;		                  //	MVI     M, 8bit_data
-        case 0x37: UnimplementedInstruction(state); break;		                  //	STC
+        case 0x37:
+            //	STC
+            // carry = 1
+            state->cc.cy = 1;
+            break;
         case 0x38: UnimplementedInstruction(state); break;		                  //	NOP
         case 0x39: DAD(state, (uint32_t)state->sp); break;                      //  DAD     SP
         case 0x3a: UnimplementedInstruction(state); break;		                  //	LDA     address
@@ -406,7 +487,11 @@ int Emulate8080(State8080* state)
         case 0x3c: INR(state, &state->a); break;                                //  INR     A
         case 0x3d: DCR(state, &state->a); break;                                //  DCR     A
         case 0x3e: UnimplementedInstruction(state); break;		                  //	MVI     A, 8bit_data
-        case 0x3f: UnimplementedInstruction(state); break;		                  //	CMC
+        case 0x3f:
+            //	CMC
+            // carry = !carry
+            state->cc.cy = !state->cc.cy;
+            break;
         case 0x40: UnimplementedInstruction(state); break;		                  //	MOV     B, B
         case 0x41: UnimplementedInstruction(state); break;		                  //	MOV     B, C
         case 0x42: UnimplementedInstruction(state); break;		                  //	MOV     B, D
@@ -505,39 +590,143 @@ int Emulate8080(State8080* state)
         case 0x9d: Arithmetic(state, state->l, SUB, CARRY);	break;		          //	SBB     L
         case 0x9e: UnimplementedInstruction(state); break;		                  //	SBB     M
         case 0x9f: Arithmetic(state, state->a, SUB, CARRY);	break;		          //	SBB     A
-        case 0xa0: UnimplementedInstruction(state); break;		                  //	ANA     B
-        case 0xa1: UnimplementedInstruction(state); break;		                  //	ANA     C
-        case 0xa2: UnimplementedInstruction(state); break;		                  //	ANA     D
-        case 0xa3: UnimplementedInstruction(state); break;		                  //	ANA     E
-        case 0xa4: UnimplementedInstruction(state); break;		                  //	ANA     H
-        case 0xa5: UnimplementedInstruction(state); break;		                  //	ANA     L
-        case 0xa6: UnimplementedInstruction(state); break;		                  //	ANA     M
-        case 0xa7: UnimplementedInstruction(state); break; 		                  // 	ANA     A
-        case 0xa8: UnimplementedInstruction(state); break;		                  //	XRA     B
-        case 0xa9: UnimplementedInstruction(state); break;		                  //  XRA     C
-        case 0xaa: UnimplementedInstruction(state); break;		                  //  XRA     D
-        case 0xab: UnimplementedInstruction(state); break;		                  //  XRA     E
-        case 0xac: UnimplementedInstruction(state); break;		                  //  XRA     H
-        case 0xad: UnimplementedInstruction(state); break;		                  //  XRA     L
-        case 0xae: UnimplementedInstruction(state); break;		                  //  XRA     M
-        case 0xaf: UnimplementedInstruction(state); break;		                  //  XRA     A
-
-        case 0xb0: UnimplementedInstruction(state); break;		//  ORA     B
-        case 0xb1: UnimplementedInstruction(state); break;		//  ORA     C
-        case 0xb2: UnimplementedInstruction(state); break;		//  ORA     D
-        case 0xb3: UnimplementedInstruction(state); break;		//  ORA     E
-        case 0xb4: UnimplementedInstruction(state); break;		//  ORA     H
-        case 0xb5: UnimplementedInstruction(state); break;		//  ORA     L
+        case 0xa0:
+            // ANA B
+            // A <- A & B
+            AND(state, state->b);
+            break;
+        case 0xa1:
+            // ANA C
+            // A <- A & C
+            AND(state, state->c);
+            break;
+        case 0xa2:
+            // ANA D
+            // A <- A & D
+            AND(state, state->d);
+            break;
+        case 0xa3:
+            // ANA E
+            // A <- A & E
+            AND(state, state->e);
+            break;
+        case 0xa4:
+            // ANA H
+            // A <- A & H
+            AND(state, state->h);
+            break;
+        case 0xa5:
+            // ANA L
+            // A <- A & L
+            AND(state, state->l);
+            break;
+        case 0xa6: UnimplementedInstruction(state); break;	 //	ANA     M
+        case 0xa7:
+            // ANA A
+            // A <- A & A
+            AND(state, state->a);
+            break;
+        case 0xa8:
+            // XRA B
+            // A <- A ^ B
+            XOR(state, state->b);
+            break;
+        case 0xa9:
+            // XRA C
+            // A <- A ^ C
+            XOR(state, state->c);
+            break;
+        case 0xaa:
+            // XRA D
+            // A <- A ^ D
+            XOR(state, state->d);
+            break;
+        case 0xab:
+            // XRA E
+            // A <- A ^ E
+            XOR(state, state->e);
+            break;
+        case 0xac:
+            // XRA H
+            // A <- A ^ H
+            XOR(state, state->h);
+            break;
+        case 0xad:
+            // XRA L
+            // A <- A ^ L
+            XOR(state, state->l);
+            break;
+        case 0xae: UnimplementedInstruction(state); break;	//  XRA     M
+        case 0xaf:
+            // XRA A
+            // A <- A ^ A
+            XOR(state, state->a);
+            break;
+        case 0xb0:
+            //  ORA B
+            // A <- A | B
+            ORA(state, state->b);
+            break;
+        case 0xb1:
+            //  ORA C
+            // A <- A | C
+            ORA(state, state->c);
+            break;
+        case 0xb2:
+            //  ORA D
+            // A <- A | D
+            ORA(state, state->d);
+            break;
+        case 0xb3:
+            //  ORA E
+            // A <- A | E
+            ORA(state, state->e);
+            break;
+        case 0xb4:
+            //  ORA H
+            // A <- A | H
+            ORA(state, state->h);
+            break;
+        case 0xb5:
+            //  ORA L
+            // A <- A | L
+            ORA(state, state->l);
+            break;
         case 0xb6: UnimplementedInstruction(state); break;		//  ORA     M
-        case 0xb7: UnimplementedInstruction(state); break;		//  ORA     A
-        case 0xb8: UnimplementedInstruction(state); break;		//  CMP     B
-        case 0xb9: UnimplementedInstruction(state); break;		//  CMP     C
-        case 0xba: UnimplementedInstruction(state); break;		//  CMP     D
-        case 0xbb: UnimplementedInstruction(state); break;		//  CMP     E
-        case 0xbc: UnimplementedInstruction(state); break;		//  CMP     H
-        case 0xbd: UnimplementedInstruction(state); break;		//  CMP     L
+        case 0xb7:
+            //  ORA A
+            // A <- A | A
+            ORA(state, state->a);
+            break;
+        case 0xb8:
+            //  CMP B
+            CMP(state, state->b);
+            break;
+        case 0xb9:
+            //  CMP C
+            CMP(state, state->c);
+            break;
+        case 0xba:
+            //  CMP D
+            CMP(state, state->d);
+            break;
+        case 0xbb:
+            //  CMP E
+            CMP(state, state->e);
+            break;
+        case 0xbc:
+            //  CMP H
+            CMP(state, state->h);
+            break;
+        case 0xbd:
+            //  CMP L
+            CMP(state, state->l);
+            break;
         case 0xbe: UnimplementedInstruction(state); break;		//  CMP     M
-        case 0xbf: UnimplementedInstruction(state); break;		//  CMP     A
+        case 0xbf:
+            //  CMP A
+            CMP(state, state->a);
+            break;
         case 0xc0:
             //  RNZ
             if (0 == state->cc.z) {
@@ -857,14 +1046,14 @@ int Emulate8080(State8080* state)
             break;
 	}
 
-	printf("\t");
-	printf("%c", state->cc.z ? 'z' : '.');
-	printf("%c", state->cc.s ? 's' : '.');
-	printf("%c", state->cc.p ? 'p' : '.');
-	printf("%c", state->cc.cy ? 'c' : '.');
-	printf("%c  ", state->cc.ac ? 'a' : '.');
-	printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x\n", state->a, state->b, state->c,
-				state->d, state->e, state->h, state->l, state->sp);
+//	printf("\t");
+//	printf("%c", state->cc.z ? 'z' : '.');
+//	printf("%c", state->cc.s ? 's' : '.');
+//	printf("%c", state->cc.p ? 'p' : '.');
+//	printf("%c", state->cc.cy ? 'c' : '.');
+//	printf("%c  ", state->cc.ac ? 'a' : '.');
+//	printf("A $%02x B $%02x C $%02x D $%02x E $%02x H $%02x L $%02x SP %04x\n", state->a, state->b, state->c,
+//				state->d, state->e, state->h, state->l, state->sp);
 
 	return 0;
 }
