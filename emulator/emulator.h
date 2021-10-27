@@ -316,8 +316,7 @@ void UnimplementedInstruction(State8080* state) {
     exit(1);
 }
 
-int Emulate8080(State8080* state)
-{
+int Emulate8080(State8080* state) {
 	unsigned char *code = &state->memory[state->pc];
 
 	Disassembler(state->memory, state->pc);
