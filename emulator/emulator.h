@@ -200,6 +200,97 @@ void RET(State8080* state) {
     state->sp += 2;
 }
 
+void POP(State8080 *state, char pop)
+{
+ // Addition
+  if (pop == 'B')
+  {
+    // Pop B and C from stack
+    state->c = state->memory[state->sp];
+    state->b = state->memory[state->sp+1];
+    // Increment pointer
+    state->sp += 2;
+  }
+  else if (pop == 'D')
+  {
+    // Pop D and E from stack
+    state->e = state->memory[state->sp];
+    state->d = state->memory[state->sp+1];
+    // Increment pointer
+    state->sp += 2;
+  }
+  else if (pop == 'H')
+  {
+    // Pop H and L from stack
+    state->l = state->memory[state->sp];
+    state->h = state->memory[state->sp+1];
+    // Increment counter
+    state->sp += 2;
+  }
+    else if (pop == 'P')
+  {
+    // Copy memory content into accumulator A
+    state->a = state->memory[state->sp+1];
+    // Set psw variable by copying memory
+    // content on top of stack. This is
+    // for flag register F.
+    uint8_t psw = state->memory[state->sp];
+    // Sets state cc struct values if equal
+    // to bitwise AND operation
+    state->cc.z  = (0x01 == (psw & 0x01));
+    state->cc.s  = (0x02 == (psw & 0x02));
+    state->cc.p  = (0x04 == (psw & 0x04));
+    state->cc.cy = (0x05 == (psw & 0x08));
+    state->cc.ac = (0x10 == (psw & 0x10));
+    // Increment pointer
+    state->sp += 2;
+  }
+}
+
+void PUSH(State8080 *state, char push)
+{
+ // Addition
+  if (push == 'B')
+  {
+    // Push B and C onto stack
+    state->memory[state->sp-1] = state->b;
+    state->memory[state->sp-2] = state->c;
+    // Decrement pointer
+    state->sp = state->sp - 2;
+  }
+  else if (push == 'D')
+  {
+    // Push D and E onto stack
+    state->memory[state->sp-1] = state->d;
+    state->memory[state->sp-2] = state->e;
+    // Decrement pointer
+    state->sp = state->sp - 2;
+  }
+  else if (push == 'H')
+  {
+    // Push H and L onto stack
+    state->memory[state->sp-1] = state->h;
+    state->memory[state->sp-2] = state->l;
+    // Decrement pointer
+    state->sp = state->sp - 2;
+  }
+    else if (push == 'P')
+  {
+    // Push accumulator A onto stack
+    state->memory[state->sp-1] = state->a;
+    // Create and set psw int variable by
+    // combining flag register F contained
+    // in state cc struct
+    uint8_t psw = (state->cc.z |
+            state->cc.s << 1 |
+            state->cc.p << 2 |
+            state->cc.cy << 3 |
+            state->cc.ac << 4 );
+    // Push psw onto stack and decrement pointer
+    state->memory[state->sp-2] = psw;
+    state->sp = state->sp - 2;
+  }
+}
 
 int Emulate8080(State8080* state)
 {
@@ -458,11 +549,7 @@ int Emulate8080(State8080* state)
         case 0xc1: 	
             //Pop a register pair on stack 					        POP    B
             {
-              // Pop B and C from stack
-              state->c = state->memory[state->sp];
-              state->b = state->memory[state->sp+1];
-              // Increment pointer
-              state->sp += 2;
+                POP(state, 'B');
             }
             break;
         case 0xc2:
@@ -488,11 +575,7 @@ int Emulate8080(State8080* state)
         case 0xc5: 			
             //Put a register pair on stack  		                PUSH   B
             {
-            // Push B and C onto stack
-            state->memory[state->sp-1] = state->b;
-            state->memory[state->sp-2] = state->c;
-            // Decrement pointer
-            state->sp = state->sp - 2;
+                PUSH(state, 'B');
             }
             break;
         case 0xc6: Arithmetic(state, code[1], ADD, NO_CARRY); state->pc += 1;	break;	//  ADI     8bit_data
@@ -550,11 +633,7 @@ int Emulate8080(State8080* state)
         case 0xd1: 			
             // Pop a register pair on stack 			            POP    D
             {
-                      // Pop D and E from stack
-              state->e = state->memory[state->sp];
-              state->d = state->memory[state->sp+1];
-                      // Increment pointer
-              state->sp += 2;
+                POP(state, 'D');
             }
             break;
         case 0xd2:
@@ -580,11 +659,7 @@ int Emulate8080(State8080* state)
         case 0xd5: 				
             //Puts a register pair on the stack		                PUSH   D
             {
-                  // Push D and E onto stack
-            state->memory[state->sp-1] = state->d;
-            state->memory[state->sp-2] = state->e;
-                  // Decrement pointer
-            state->sp = state->sp - 2;
+                PUSH(state, 'D');
             }
             break;
         case 0xd6: Arithmetic(state, code[1], SUB, NO_CARRY); state->pc += 1; break;  //  SUI     8bit_data
@@ -635,11 +710,7 @@ int Emulate8080(State8080* state)
         case 0xe1: 					
             //Pop a register from the stack                         POP    H
             {
-                      // Pop H and L from stack
-              state->l = state->memory[state->sp];
-              state->h = state->memory[state->sp+1];
-                      // Increment counter
-              state->sp += 2;
+                POP(state, 'H');
             }
             break;
         case 0xe2:
@@ -662,11 +733,7 @@ int Emulate8080(State8080* state)
         case 0xe5: 						
             //Puts a register pair on the stack                   PUSH   H
             {
-                  // Push H and L onto stack
-            state->memory[state->sp-1] = state->h;
-            state->memory[state->sp-2] = state->l;
-                  // Decrement pointer
-            state->sp = state->sp - 2;
+                PUSH(state, 'H');
             }
             break;
         case 0xe6: UnimplementedInstruction(state); break;		//  ANI     8bit_data
@@ -718,21 +785,7 @@ int Emulate8080(State8080* state)
             // Pops PROGRAM STATUS WORD on the stack                POP PSW
             // PSW combines accumulator A and flag register F
             {
-                      // Copy memory content into accumulator A
-              state->a = state->memory[state->sp+1];
-                      // Set psw variable by copying memory
-                      // content on top of stack. This is
-                      // for flag register F.
-              uint8_t psw = state->memory[state->sp];
-                      // Sets state cc struct values if equal
-                      // to bitwise AND operation
-              state->cc.z  = (0x01 == (psw & 0x01));
-              state->cc.s  = (0x02 == (psw & 0x02));
-              state->cc.p  = (0x04 == (psw & 0x04));
-              state->cc.cy = (0x05 == (psw & 0x08));
-              state->cc.ac = (0x10 == (psw & 0x10));
-                      // Increment pointer
-              state->sp += 2;
+                POP(state, 'P');
             }
             break;
         case 0xf2:
@@ -759,19 +812,7 @@ int Emulate8080(State8080* state)
             // Puts PROGRAM STATUS WORD on the stack                PUSH PSW
             // PSW combines accumulator A and flag register F
             {
-                  // Push accumulator A onto stack
-            state->memory[state->sp-1] = state->a;
-                  // Create and set psw int variable by
-                  // combining flag register F contained
-                  // in state cc struct
-            uint8_t psw = (state->cc.z |
-                    state->cc.s << 1 |
-                    state->cc.p << 2 |
-                    state->cc.cy << 3 |
-                    state->cc.ac << 4 );
-                  // Push psw onto stack and decrement pointer
-            state->memory[state->sp-2] = psw;
-            state->sp = state->sp - 2;
+                PUSH(state, 'P');
             }
 			      break;
         case 0xf6: UnimplementedInstruction(state); break;		//  ORI     8bit_data
