@@ -203,14 +203,31 @@ void RET(State8080* state) {
 void AND(State8080* state, uint8_t reg) {
     // Logical AND reg with the accumulator
     // Value is stored in the accumulator
-    uint8_t  result;
-    result = state->a & reg;
-    HandleZSP_Flags(state, result);
+    state->a = state->a & reg;
+    HandleZSP_Flags(state, state->a)
 
     // Resets carry bit to zero
     state->cc.cy = 0;
+}
 
-    state->a = result;
+void XOR(State8080* state, uint8_t reg) {
+    // Exclusive OR between reg and accumulator
+    // Value stored in accumulator
+    state->a = state->a ^ reg;
+    HandleZSP_Flags(state, state->a);
+
+    // Resets carry bit to zero
+    state->cc.cy = 0;
+}
+
+void ORA(State8080* state, uint8_t reg) {
+    // Inclusive OR between reg and accumulator
+    // Value stored in accumulator
+    state->a = state->a | reg;
+    HandleZSP_Flags(state, state->a);
+
+    // Resets carry bit to zero
+    state->cc.cy = 0;
 }
 
 int Emulate8080(State8080* state)
@@ -431,30 +448,109 @@ int Emulate8080(State8080* state)
             // A <- A & B
             AND(state, state->b);
             break;
-        case 0xa1: UnimplementedInstruction(state); break;		                  //	ANA     C
-        case 0xa2: UnimplementedInstruction(state); break;		                  //	ANA     D
-        case 0xa3: UnimplementedInstruction(state); break;		                  //	ANA     E
-        case 0xa4: UnimplementedInstruction(state); break;		                  //	ANA     H
-        case 0xa5: UnimplementedInstruction(state); break;		                  //	ANA     L
-        case 0xa6: UnimplementedInstruction(state); break;		                  //	ANA     M
-        case 0xa7: UnimplementedInstruction(state); break; 		                  // 	ANA     A
-        case 0xa8: UnimplementedInstruction(state); break;		                  //	XRA     B
-        case 0xa9: UnimplementedInstruction(state); break;		                  //  XRA     C
-        case 0xaa: UnimplementedInstruction(state); break;		                  //  XRA     D
-        case 0xab: UnimplementedInstruction(state); break;		                  //  XRA     E
-        case 0xac: UnimplementedInstruction(state); break;		                  //  XRA     H
-        case 0xad: UnimplementedInstruction(state); break;		                  //  XRA     L
-        case 0xae: UnimplementedInstruction(state); break;		                  //  XRA     M
-        case 0xaf: UnimplementedInstruction(state); break;		                  //  XRA     A
-
-        case 0xb0: UnimplementedInstruction(state); break;		//  ORA     B
-        case 0xb1: UnimplementedInstruction(state); break;		//  ORA     C
-        case 0xb2: UnimplementedInstruction(state); break;		//  ORA     D
-        case 0xb3: UnimplementedInstruction(state); break;		//  ORA     E
-        case 0xb4: UnimplementedInstruction(state); break;		//  ORA     H
-        case 0xb5: UnimplementedInstruction(state); break;		//  ORA     L
+        case 0xa1:
+            // ANA C
+            // A <- A & C
+            AND(state, state->c);
+            break;
+        case 0xa2:
+            // ANA D
+            // A <- A & D
+            AND(state, state->d);
+            break;
+        case 0xa3:
+            // ANA E
+            // A <- A & E
+            AND(state, state->e);
+            break;
+        case 0xa4:
+            // ANA H
+            // A <- A & H
+            AND(state, state->h);
+            break;
+        case 0xa5:
+            // ANA L
+            // A <- A & L
+            AND(state, state->l);
+            break;
+        case 0xa6: UnimplementedInstruction(state); break;	 //	ANA     M
+        case 0xa7:
+            // ANA A
+            // A <- A & A
+            AND(state, state->a);
+            break;
+        case 0xa8:
+            // XRA B
+            // A <- A ^ B
+            XOR(state, state->b);
+            break;
+        case 0xa9:
+            // XRA C
+            // A <- A ^ C
+            XOR(state, state->c);
+            break;
+        case 0xaa:
+            // XRA D
+            // A <- A ^ D
+            XOR(state, state->d);
+            break;
+        case 0xab:
+            // XRA E
+            // A <- A ^ E
+            XOR(state, state->e);
+            break;
+        case 0xac:
+            // XRA H
+            // A <- A ^ H
+            XOR(state, state->h);
+            break;
+        case 0xad:
+            // XRA L
+            // A <- A ^ L
+            XOR(state, state->l);
+            break;
+        case 0xae: UnimplementedInstruction(state); break;	//  XRA     M
+        case 0xaf:
+            // XRA A
+            // A <- A ^ A
+            XOR(state, state->a);
+            break;
+        case 0xb0:
+            //  ORA B
+            // A <- A | B
+            ORA(state, state->b);
+            break;
+        case 0xb1:
+            //  ORA C
+            // A <- A | C
+            ORA(state, state->c);
+            break;
+        case 0xb2:
+            //  ORA D
+            // A <- A | D
+            ORA(state, state->d);
+            break;
+        case 0xb3:
+            //  ORA E
+            // A <- A | E
+            ORA(state, state->e);
+            break;
+        case 0xb4:
+            //  ORA H
+            // A <- A | H
+            ORA(state, state->h);
+            break;
+        case 0xb5:
+            //  ORA L
+            // A <- A | L
+            ORA(state, state->l);
+            break;
         case 0xb6: UnimplementedInstruction(state); break;		//  ORA     M
-        case 0xb7: UnimplementedInstruction(state); break;		//  ORA     A
+        case 0xb7:
+            //  ORA A
+            // A <- A | A
+            ORA(state, state->a);
+            break;
         case 0xb8: UnimplementedInstruction(state); break;		//  CMP     B
         case 0xb9: UnimplementedInstruction(state); break;		//  CMP     C
         case 0xba: UnimplementedInstruction(state); break;		//  CMP     D
