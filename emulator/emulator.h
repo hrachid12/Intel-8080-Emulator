@@ -46,7 +46,7 @@ int ParityCheck(uint8_t value) {
     }
 
     // 8080 sets with even parity
-    if (count % 2 == 0 {
+    if (count % 2 == 0) {
         return 1;
     }
     return 0;
@@ -352,12 +352,14 @@ int Emulate8080(State8080* state)
         case 0x05: DCR(state, &state->b); break;                                //  DCR     B
         case 0x06: MOV(&state->b, code[1]); state->pc += 1; break;              //	MVI     B, 8bit_data
         case 0x07:                                        	                  	//	RLC
-                  // Rotate accumulator left
-                  // 	A = A << 1; bit 0 = prev bit 7; CY = prev bit 7
-                  uint8_t temp = state->a;
-                  state->a = ((temp & 0x80) >> 7) | (temp << 1);
-                  state->cc.cy = (1 == (temp & 0x80));
-                  break;
+                {
+                    // Rotate accumulator left
+                    // 	A = A << 1; bit 0 = prev bit 7; CY = prev bit 7
+                    uint8_t temp = state->a;
+                    state->a = ((temp & 0x80) >> 7) | (temp << 1);
+                    state->cc.cy = (1 == (temp & 0x80));
+                    break;
+                }
         case 0x08: break;		                                                    //	NOP
         case 0x09: DAD(state, (uint32_t)(state->b << 8 | state->c)); break;     //  DAD     BC
         case 0x0a:                                                              //	LDAX    BC
@@ -379,12 +381,15 @@ int Emulate8080(State8080* state)
         case 0x0d: DCR(state, &state->c); break;                                //  DCR     C
         case 0x0e: MOV(&state->c, code[1]); state->pc += 1; break;              //  MVI     C, 8bit_data
         case 0x0f:                                         		                  //	RRC
-                  // Rotate accumulator right
-                  // 	A = A >> 1; bit 7 = prev bit 0; CY = prev bit 0
-                  uint8_t temp = state->a;
-                  state->a = ((temp & 1) << 7) | (temp >> 1);
-                  state->cc.cy = (1 == (temp&1));
-                  break;
+                {
+                    // Rotate accumulator right
+                    // 	A = A >> 1; bit 7 = prev bit 0; CY = prev bit 0
+                    uint8_t temp;
+                    temp = state->a;
+                    state->a = ((temp & 1) << 7) | (temp >> 1);
+                    state->cc.cy = (1 == (temp & 1));
+                    break;
+                }
         case 0x10: break;		                                                    //	NOP
         case 0x11:                                                              //  LXI     D, 16bit_data
                   {
@@ -412,13 +417,15 @@ int Emulate8080(State8080* state)
         case 0x15: DCR(state, &state->d); break;                                //  DCR     D
         case 0x16: MOV(&state->d, code[1]); state->pc += 1; break;		          //	MVI     D, 8bit_data
         case 0x17:                                        		                  //	RAL
-                  // RAL
-                  // Rotate accumulator left through carry
-                  // A = A << 1; bit 0 = prev CY; CY = prev bit 7
-                  uint8_t temp = state->a;
-                  state->a = state->cc.cy | (temp << 1);
-                  state->cc.cy = (0x80 == (temp & 0x80));
-                  break;
+                {
+                    // RAL
+                    // Rotate accumulator left through carry
+                    // A = A << 1; bit 0 = prev CY; CY = prev bit 7
+                    uint8_t temp = state->a;
+                    state->a = state->cc.cy | (temp << 1);
+                    state->cc.cy = (0x80 == (temp & 0x80));
+                    break;
+                }
         case 0x18: break;		                                                    //	NOP
         case 0x19: DAD(state, (uint32_t)(state->d << 8 | state->e)); break;     //  DAD     DE
         case 0x1a:                                          	                  //	LDAX    DE
@@ -440,12 +447,14 @@ int Emulate8080(State8080* state)
         case 0x1d: DCR(state, &state->e); break;                                //  DCR     E
         case 0x1e: MOV(&state->e, code[1]); state->pc += 1; break;		          //	MVI     E, 8bit_data
         case 0x1f:                                        		                  //	RAR
-                  // Rotate accumulator right through carry
-                  // A = A >> 1; bit 7 = prev bit 7; CY = prev bit 0
-                  uint8_t temp = state->a;
-                  state->a = (state->cc.cy << 7) | (temp >> 1);
-                  state->cc.cy = (1 == (temp & 1));
-                  break;
+                {
+                    // Rotate accumulator right through carry
+                    // A = A >> 1; bit 7 = prev bit 7; CY = prev bit 0
+                    uint8_t temp = state->a;
+                    state->a = (state->cc.cy << 7) | (temp >> 1);
+                    state->cc.cy = (1 == (temp & 1));
+                    break;
+                }
         case 0x20: break;		                                                    //	NOP
         case 0x21:                                                              //  LXI     H, 16bit_data
                   {
@@ -1055,7 +1064,7 @@ int Emulate8080(State8080* state)
                   }
                   break;
         case 0xe5: 						
-                  / /Puts a register pair on the stack                   PUSH   H
+                  //Puts a register pair on the stack                   PUSH   H
                   {
                       PUSH(state, 'H');
                   }
@@ -1087,17 +1096,19 @@ int Emulate8080(State8080* state)
                   }
                   break;
         case 0xeb:
-                  //  XCHG
-                  // Exchange the data in the H and D registers
-                  // and in the L and E registers
-                  uint8_t temp1 = state->h;
-                  uint8_t temp2 = state->l;
+                {
+                    //  XCHG
+                    // Exchange the data in the H and D registers
+                    // and in the L and E registers
+                    uint8_t temp1 = state->h;
+                    uint8_t temp2 = state->l;
 
-                  state->h = state->d;
-                  state->l = state->e;
-                  state->d = temp1;
-                  state->e = temp2;
-                  break;
+                    state->h = state->d;
+                    state->l = state->e;
+                    state->d = temp1;
+                    state->e = temp2;
+                    break;
+                }
         case 0xec:
                   //  CPE     address
                   if (1 == state->cc.p) {
