@@ -35,6 +35,34 @@ typedef struct State8080 {
 	uint8_t		int_enable;
 } State8080;
 
+typedef struct {
+    int size;
+    uint8_t *mem;
+} mem_t;
+
+mem_t *mem_new(int size) {
+    mem_t *mem = malloc(sizeof(mem_t));
+    mem->size = size;
+
+    mem->mem = malloc(sizeof(uint8_t) * size);
+
+    return mem;
+}
+
+void GenerateInterrupt(State8080* state, int interrupt_num) {    
+    //perform "PUSH PC"    
+    //Push(state, (state->pc & 0xFF00) >> 8, (state->pc & 0xff));
+    // Push P and C onto stack
+    state->memory[state->pc-1] = (state->pc & 0xFF00) >> 8;
+    state->memory[state->pc-2] = (state->pc & 0xff);
+    // Decrement pointer
+    state->pc = state->pc - 2;
+
+    //Set the PC to the low memory vector.    
+    //This is identical to an "RST interrupt_num" instruction.    
+    state->pc = 8 * interrupt_num;    
+}
+
 int ParityCheck(uint8_t value) {
     // Checks if passed value has even or odd parity
     uint8_t count = 0;
@@ -509,13 +537,13 @@ int Emulate8080(State8080* state) {
         case 0x33: state->sp += 0x01; break;		                                //	INX     SP
         case 0x34:                                                              //	INR     M
                   {
-                    u_int16_t mem_reference = (state->h << 8 | state->l);
+                    uint16_t mem_reference = (state->h << 8 | state->l);
                     INR(state, &state->memory[mem_reference]);
                     break;
                   }
         case 0x35:                                                              //	DCR     M
                   {
-                    u_int16_t mem_reference = (state->h << 8 | state->l);
+                    uint16_t mem_reference = (state->h << 8 | state->l);
                     DCR(state, &state->memory[mem_reference]);
                     break;
                   }
@@ -537,7 +565,7 @@ int Emulate8080(State8080* state) {
                     // Loads accumulator with value stored in memory at passed addr
                     uint16_t mem_reference = code[2] << 8 | code[1];
                     state->a = state->memory[mem_reference];
-                    state->pc += 1;
+                    state->pc += 2;
                     break;
                   }
         case 0x3b: state->sp -= 0x01; break;		                                //	DCX     SP
