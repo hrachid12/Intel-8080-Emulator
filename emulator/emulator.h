@@ -33,6 +33,7 @@ typedef struct State8080 {
 	uint8_t		*memory;
 	struct ConditionCodes		cc;
 	uint8_t		int_enable;
+    unsigned int     done;
 } State8080;
 
 // number of cycles to complete each instruction by opcode
@@ -276,7 +277,7 @@ void CMP(State8080* state, uint8_t reg) {
     HandleZSP_Flags(state, result);
 
     // Handle carry flag
-    if (result > 0xff) { state->cc.cy = 1; }
+    if (reg > state->a) { state->cc.cy = 1; }
     else { state->cc.cy = 0; }
 }
 
@@ -360,6 +361,7 @@ void UnimplementedInstruction(State8080* state) {
     // Print error along with associated instruction
     printf ("Error: Unimplemented instruction\n");
     state->pc--;
+    printf("%d\n", state->done);
     Disassembler(state->memory, state->pc);
     printf("\n");
     exit(1);
@@ -1121,6 +1123,7 @@ int Emulate8080(State8080* state) {
                   // ANI 8bit_data
                   // A <- A & data
                   AND(state, code[1]);
+                  state->pc+=1;
                   break;
         case 0xe7:
                   //  RST     4
@@ -1251,6 +1254,7 @@ int Emulate8080(State8080* state) {
         case 0xfe:
                   // CPI 8bit_data
                   CMP(state, code[1]);
+                  state->pc+=1;
                   break;
         case 0xff:
                   //  RST     7

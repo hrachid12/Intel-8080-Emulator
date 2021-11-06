@@ -118,6 +118,8 @@ State8080* Init8080(void)
 	State8080* state = calloc(1,sizeof(State8080));
 	state->memory = malloc(0x10000);  //16K
 
+	state->done = 0;
+
 	// SDL Init returns zero on success
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         printf("Error initializing SDL: %s\n", SDL_GetError());
@@ -157,10 +159,10 @@ int main (int argc, char**argv)
 	int done = 0;
 	int vblankcycles = 0;
 	//time_t seconds;
-    double now;                  // current time
-    double lastTime = 0.;        // last time recorded
-    double nextInterrupt;        // time next interrupt should fire
-    int whichInterrupt;          // which interrupt should be sent
+	double now;                  // current time
+	double lastTime = 0.;        // last time recorded
+	double nextInterrupt;        // time next interrupt should fire
+	int whichInterrupt;          // which interrupt should be sent
      
 	State8080* state = Init8080();
 
@@ -218,6 +220,7 @@ int main (int argc, char**argv)
             else
             {
                 cycles += Emulate8080(state);
+								state->done += 1;
             }            
         }
         lastTime = GetTimeStamp();
