@@ -3,7 +3,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <SDL.h>
+#include <SDL2/SDL.h>
+#include <sys/time.h>
 #include <time.h>
 
 #include "./disassembler/disassembler.h"
@@ -16,8 +17,18 @@ SDL_Window *window;
 SDL_Surface *winsurface;
 mem_t *ram;
 
+uint8_t     shift0;         // Least significant byte of Space Invader's external shift hardware
+uint8_t     shift1;         // Most significant byte of Space Invaders external shift hardware
+uint8_t     shift_offset;   // offset for external shift hardware
+
 #define HEIGHT 256
 #define WIDTH 224
+
+double GetTimeStamp() {
+    struct timeval time;
+    gettimeofday(&time, NULL);
+    return ((double)time.tv_sec * 1E6) + ((double)time.tv_usec);
+    }
 
 void ReadFileIntoMemoryAt(State8080* state, char* filename, uint32_t offset)
 {
@@ -51,7 +62,6 @@ void draw_video_ram(State8080* state) {
                     pix[idx] = 0x000000;
                 }
             }
-
             i++;
         }
     }
@@ -65,6 +75,41 @@ void draw_video_ram(State8080* state) {
     // Update window
     if (SDL_UpdateWindowSurface(window)) {
         puts(SDL_GetError());
+    }
+}
+
+uint8_t handleSpaceInvadersIN(uint8_t port)
+{
+    unsigned char a;
+    switch(port)
+    {
+        case 0:
+                return 1;
+                break;
+        case 1: 
+                return 0;
+                break;
+        case 3: // returns data shifted by the shift amount
+            {
+                uint16_t v = (shift1 << 8) | shift0;
+                a = ((v >> (8-shift_offset)) & 0xff);
+            }
+                break;
+    }
+    return a;
+}
+
+void handleSpaceInvadersOUT(uint8_t port, uint8_t value)
+{
+    switch(port)
+    {
+        case 2: // sets the shift amount
+                shift_offset = value & 0x7;
+                break;
+        case 4: // sets the data in the shift registers
+                shift0 = shift1;
+                shift1 = value;
+                break;
     }
 }
 
@@ -85,6 +130,7 @@ State8080* Init8080(void)
             2*WIDTH, 2*HEIGHT,
             SDL_WINDOW_RESIZABLE
             );
+
     if (!window) {
         puts("Failed to create window");
         exit(1);
@@ -110,8 +156,11 @@ int main (int argc, char**argv)
 {
 	int done = 0;
 	int vblankcycles = 0;
-	int lastInterrupt = 0;
-	time_t seconds;
+	//time_t seconds;
+    double now;                  // current time
+    double lastTime = 0.;        // last time recorded
+    double nextInterrupt;        // time next interrupt should fire
+    int whichInterrupt;          // which interrupt should be sent
      
 	State8080* state = Init8080();
 
@@ -120,10 +169,60 @@ int main (int argc, char**argv)
 	ReadFileIntoMemoryAt(state, "./ROMs/invaders.f", 0x1000);
 	ReadFileIntoMemoryAt(state, "./ROMs/invaders.e", 0x1800);
 
-	while (done == 0)
+	while (1)
 	{
-		done = Emulate8080(state);
-		seconds = time(NULL);
+        now = GetTimeStamp();
+        
+        if (lastTime == 0.){
+            lastTime = now;
+            nextInterrupt = lastTime + 16000.0;
+            whichInterrupt = 1;
+        }
+
+        if ((state->int_enable) && (now > nextInterrupt))
+        {
+            if (whichInterrupt == 1)
+            {
+                GenerateInterrupt(state, 1);
+                whichInterrupt = 2;
+            }
+            else
+            {
+                GenerateInterrupt(state, 2);
+                whichInterrupt = 1;
+            }
+            lastTime = now;
+            nextInterrupt = now + 8000.0;
+        }
+
+        double sinceLast = now - lastTime;
+        int cycles_to_catch_up = 2 * sinceLast;
+        int cycles = 0;
+
+        while (cycles_to_catch_up > cycles)
+        {
+            unsigned char *op;
+            op = &state->memory[state->pc];
+            if (*op == 0xdb) // machine IN instruction
+            {
+                state->a = handleSpaceInvadersIN(op[1]);
+                state->pc += 2;
+                cycles += 3;
+            }
+            else if (*op == 0xd3) // machine OUT instruction
+            {
+                handleSpaceInvadersOUT(op[1], state->a);
+                state->pc+=2;
+                cycles+=3;
+            }
+            else
+            {
+                cycles += Emulate8080(state);
+            }            
+        }
+        lastTime = GetTimeStamp();
+        /*
+
 		//printf("Time is %d - %d = %d", seconds, lastInterrupt, seconds - lastInterrupt);
 		if (seconds - lastInterrupt > 1.0/60.0)  //1/60 second has elapsed    
         {    
@@ -137,7 +236,8 @@ int main (int argc, char**argv)
                 //Save the time we did this    
                 lastInterrupt = seconds;    
             }    
-        }   
+        }
+        */
 		draw_video_ram(state);
 	}
 	return 0;

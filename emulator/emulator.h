@@ -35,6 +35,26 @@ typedef struct State8080 {
 	uint8_t		int_enable;
 } State8080;
 
+// number of cycles to complete each instruction by opcode
+unsigned char cycles[] = {
+     4, 10,  7,  5,  5,  5,  7,  4,  4, 10,  7,  5,  5,  5, 7,  4,  // 0x00 - 0x0f
+     4, 10,  7,  5,  5,  5,  7,  4,  4, 10,  7,  5,  5,  5, 7,  4,  // 0x10 - 0x1f
+     4, 10, 16,  5,  5,  5,  7,  4,  4, 10, 16,  5,  5,  5, 7,  4,  // 0x20 - 0x2f
+     4, 10, 13,  5, 10, 10, 10,  4,  4, 10, 13,  5,  5,  5, 7,  4,  // 0x30 - 0x3f
+	 5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5, 7,  5,  // 0x40 - 0x4f
+	 5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5, 7,  5,  // 0x50 - 0x5f
+	 5,  5,  5,  5,  5,  5,  7,  5,  5,  5,  5,  5,  5,  5, 7,  5,  // 0x60 - 0x6f
+	 7,  7,  7,  7,  7,  7,  7,  7,  5,  5,  5,  5,  5,  5, 7,  5,  // 0x70 - 0x7f
+	 4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4, 7,  4,  // 0x80 - 0x8f
+	 4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4, 7,  4,  // 0x90 - 0x9f
+	 4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4, 7,  4,  // 0xa0 - 0xaf
+	 4,  4,  4,  4,  4,  4,  7,  4,  4,  4,  4,  4,  4,  4, 7,  4,  // 0xb0 - 0xbf
+	11, 10, 10, 10, 17, 11,  7, 11, 11, 10, 10, 10, 10, 17, 7, 11,  // 0xc0 - 0xcf
+	11, 10, 10, 10, 17, 11,  7, 11, 11, 10, 10, 10, 10, 17, 7, 11,  // 0xd0 - 0xdf
+	11, 10, 10, 18, 17, 11,  7, 11, 11,  5, 10,  5, 17, 17, 7, 11,  // 0xe0 - 0xef
+	11, 10, 10,  4, 17, 11,  7, 11, 11,  5, 10,  4, 17, 17, 7, 11,  // 0xf0 - 0xff
+};
+
 typedef struct {
     int size;
     uint8_t *mem;
@@ -60,7 +80,8 @@ void GenerateInterrupt(State8080* state, int interrupt_num) {
 
     //Set the PC to the low memory vector.    
     //This is identical to an "RST interrupt_num" instruction.    
-    state->pc = 8 * interrupt_num;    
+    state->pc = 8 * interrupt_num;
+    state->int_enable = 0;    
 }
 
 int ParityCheck(uint8_t value) {
@@ -1236,6 +1257,5 @@ int Emulate8080(State8080* state) {
                   RST(state, 7);
                   break;
 	}
-
-	return 0;
+	return cycles[*code];
 }
