@@ -3,9 +3,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <SDL2/SDL.h>
 #include <sys/time.h>
 #include <time.h>
+
+#ifdef _WIN32
+    #include <SDL.h>
+#elif __APPLE__
+    #include <SDL2/SDL.h>
+#endif
 
 #include "./disassembler/disassembler.h"
 #include "./emulator/emulator.h"
@@ -17,18 +22,15 @@ SDL_Window *window;
 SDL_Surface *winsurface;
 mem_t *ram;
 
-uint8_t     shift0;         // Least significant byte of Space Invader's external shift hardware
-uint8_t     shift1;         // Most significant byte of Space Invaders external shift hardware
+static uint16_t shift_register;
 uint8_t     shift_offset;   // offset for external shift hardware
 
 #define HEIGHT 256
-#define WIDTH 224
+#define WIDTH  224
 
-double GetTimeStamp() {
-    struct timeval time;
-    gettimeofday(&time, NULL);
-    return ((double)time.tv_sec * 1E6) + ((double)time.tv_usec);
-    }
+#define FRAMERATE         (1000.0 / 60.0)   // ms per frame
+#define CYCLES_PER_MS      2000             // 8080 runs at 2 Mhz
+#define CYCLES_PER_FRAME  (CYCLES_PER_MS * FRAMERATE)
 
 void ReadFileIntoMemoryAt(State8080* state, char* filename, uint32_t offset)
 {
@@ -47,7 +49,7 @@ void ReadFileIntoMemoryAt(State8080* state, char* filename, uint32_t offset)
 	fclose(f);
 }
 
-void draw_video_ram(State8080* state) {
+void DrawVideoRAM(State8080* state) {
     uint32_t *pix = surface->pixels;
 
     int i = 0x2400;  // Start of Video RAM
@@ -66,9 +68,9 @@ void draw_video_ram(State8080* state) {
         }
     }
 
-    // if (resizef) {
+    if (resizef) {
     winsurface = SDL_GetWindowSurface(window);
-    // }
+    }
 
     SDL_BlitScaled(surface, NULL, winsurface, NULL);
 
@@ -78,9 +80,10 @@ void draw_video_ram(State8080* state) {
     }
 }
 
-uint8_t handleSpaceInvadersIN(uint8_t port)
+uint8_t HandleSpaceInvadersIN(uint8_t port)
 {
-    unsigned char a;
+    // returns value to be put into state->a
+    unsigned char a = 0;
     switch(port)
     {
         case 0:
@@ -91,26 +94,36 @@ uint8_t handleSpaceInvadersIN(uint8_t port)
                 break;
         case 3: // returns data shifted by the shift amount
             {
-                uint16_t v = (shift1 << 8) | shift0;
-                a = ((v >> (8-shift_offset)) & 0xff);
+                a = shift_register >> (8 - shift_offset);;
             }
                 break;
     }
     return a;
 }
 
-void handleSpaceInvadersOUT(uint8_t port, uint8_t value)
+void HandleSpaceInvadersOUT(uint8_t port, uint8_t value)
 {
     switch(port)
     {
         case 2: // sets the shift amount
-                shift_offset = value & 0x7;
+                shift_offset = value;
                 break;
         case 4: // sets the data in the shift registers
-                shift0 = shift1;
-                shift1 = value;
+                shift_register = (value << 8) | (shift_register >> 8);
                 break;
     }
+}
+
+void HandleInput() {
+    SDL_Event ev;
+    while (SDL_PollEvent(&ev)) {
+        if (ev.type == SDL_QUIT){
+            exit(0);
+        }
+        if (ev.type == SDL_KEYDOWN){
+            exit(0);
+        }
+    }  
 }
 
 State8080* Init8080(void)
@@ -118,11 +131,10 @@ State8080* Init8080(void)
 	State8080* state = calloc(1,sizeof(State8080));
 	state->memory = malloc(0x10000);  //16K
 
-	state->done = 0;
-
 	// SDL Init returns zero on success
-    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("Error initializing SDL: %s\n", SDL_GetError());
+        exit(1);
     }
 
 	// Creates a window for the game
@@ -154,16 +166,80 @@ State8080* Init8080(void)
 	return state;
 }
 
-int main (int argc, char**argv)
+// Helper function to compare our emulator with a working one for debugging
+int CompareEmulators(State8080* state, State8080* state2)
 {
-	int done = 0;
-	int vblankcycles = 0;
-	//time_t seconds;
-	double now;                  // current time
-	double lastTime = 0.;        // last time recorded
-	double nextInterrupt;        // time next interrupt should fire
-	int whichInterrupt;          // which interrupt should be sent
-     
+    int result = 0;
+    if (state->a != state2->a)
+    {
+        printf("Error: Expected A to be %02x, was %02x\n", state2->a, state->a);
+        result = 1;
+    }
+    if (state->b != state2->b)
+    {
+        printf("Error: Expected B to be %02x, was %02x\n", state2->b, state->b);
+        result = 1;
+    }
+    if (state->c != state2->c)
+    {
+        printf("Error: Expected C to be %02x, was %02x\n", state2->c, state->c);
+        result = 1;
+    }
+    if (state->d != state2->d)
+    {
+        printf("Error: Expected D to be %02x, was %02x\n", state2->d, state->d);
+        result = 1;
+    }
+    if (state->e != state2->e)
+    {
+        printf("Error: Expected E to be %02x, was %02x\n", state2->e, state->e);
+        result = 1;
+    }
+    if (state->h != state2->h)
+    {
+        printf("Error: Expected H to be %02x, was %02x\n", state2->h, state->h);
+        result = 1;
+    }
+    if (state->l != state2->l)
+    {
+        printf("Error: Expected L to be %02x, was %02x\n", state2->l, state->l);
+        result = 1;
+    }
+    if (state->sp != state2->sp)
+    {
+        printf("Error: Expected SP to be %04x, was %04x\n", state->sp, state->sp);
+        result = 1;
+    }
+    if (state->pc != state2->pc)
+    {
+        printf("Error: Expected PC to be %04x, was %04x\n", state2->pc, state->pc);
+        result = 1;
+    }
+    if (state->cc.cy != state2->cc.cy)
+    {
+        printf("Error: Expected CYF to be %02x, was %02x\n", state2->cc.cy, state->cc.cy);
+        result = 1;
+    }
+    if (state->cc.z != state2->cc.z)
+    {
+        printf("Error: Expected ZF to be %02x, was %02x\n", state2->cc.z, state->cc.z);
+        result = 1;
+    }
+    if (state->cc.s != state2->cc.s)
+    {
+        printf("Error: Expected SF to be %02x, was %02x\n", state2->cc.s, state->cc.s);
+        result = 1;
+    }
+    if (state->cc.p != state2->cc.p)
+    {
+        printf("Error: Expected PF to be %02x, was %02x\n", state2->cc.p, state->cc.p);
+        result = 1;
+    }
+    return result;
+}
+
+int main (int argc, char**argv)
+{     
 	State8080* state = Init8080();
 
 	ReadFileIntoMemoryAt(state, "./ROMs/invaders.h", 0);
@@ -171,77 +247,69 @@ int main (int argc, char**argv)
 	ReadFileIntoMemoryAt(state, "./ROMs/invaders.f", 0x1000);
 	ReadFileIntoMemoryAt(state, "./ROMs/invaders.e", 0x1800);
 
+    uint32_t lastTime = SDL_GetTicks();
 	while (1)
 	{
-        now = GetTimeStamp();
-        
-        if (lastTime == 0.){
-            lastTime = now;
-            nextInterrupt = lastTime + 16000.0;
-            whichInterrupt = 1;
-        }
-
-        if ((state->int_enable) && (now > nextInterrupt))
+        unsigned char *op;
+        int cycles = 0;
+        if (SDL_GetTicks() - lastTime >= FRAMERATE)
         {
-            if (whichInterrupt == 1)
+            lastTime = SDL_GetTicks();
+            while (cycles < CYCLES_PER_FRAME / 2)
+            {
+                op = &state->memory[state->pc];
+                if (*op == 0xdb) // machine IN instruction
+                {
+                    state->a = HandleSpaceInvadersIN(op[1]);
+                    state->pc += 2;
+                    cycles += 3;
+                }
+                else if (*op == 0xd3) // machine OUT instruction
+                {
+                    HandleSpaceInvadersOUT(op[1], state->a);
+                    state->pc+=2;
+                    cycles+=3;
+                }
+                else
+                {   
+                    cycles += Emulate8080(state);
+                }
+            }
+
+            if (state->int_enable)
             {
                 GenerateInterrupt(state, 1);
-                whichInterrupt = 2;
             }
-            else
+
+            HandleInput();
+            DrawVideoRAM(state);
+
+            while (cycles < CYCLES_PER_FRAME)
+            {
+                op = &state->memory[state->pc];
+                if (*op == 0xdb) // machine IN instruction
+                {
+                    state->a = HandleSpaceInvadersIN(op[1]);
+                    state->pc += 2;
+                    cycles += 3;
+                }
+                else if (*op == 0xd3) // machine OUT instruction
+                {
+                    HandleSpaceInvadersOUT(op[1], state->a);
+                    state->pc+=2;
+                    cycles+=3;
+                }
+                else
+                {   
+                    cycles += Emulate8080(state);
+                }
+            }
+
+            if (state->int_enable) 
             {
                 GenerateInterrupt(state, 2);
-                whichInterrupt = 1;
             }
-            lastTime = now;
-            nextInterrupt = now + 8000.0;
         }
-
-        double sinceLast = now - lastTime;
-        int cycles_to_catch_up = 2 * sinceLast;
-        int cycles = 0;
-
-        while (cycles_to_catch_up > cycles)
-        {
-            unsigned char *op;
-            op = &state->memory[state->pc];
-            if (*op == 0xdb) // machine IN instruction
-            {
-                state->a = handleSpaceInvadersIN(op[1]);
-                state->pc += 2;
-                cycles += 3;
-            }
-            else if (*op == 0xd3) // machine OUT instruction
-            {
-                handleSpaceInvadersOUT(op[1], state->a);
-                state->pc+=2;
-                cycles+=3;
-            }
-            else
-            {
-                cycles += Emulate8080(state);
-								state->done += 1;
-            }            
-        }
-        lastTime = GetTimeStamp();
-        /*
-
-		//printf("Time is %d - %d = %d", seconds, lastInterrupt, seconds - lastInterrupt);
-		if (seconds - lastInterrupt > 1.0/60.0)  //1/60 second has elapsed    
-        {    
-			printf("Interrupt is %d\n", state->int_enable);
-            //only do an interrupt if they are enabled    
-            if (state->int_enable)    
-            {    
-				printf("Test!");
-                GenerateInterrupt(state, 2);    //interrupt 2    
-
-                //Save the time we did this    
-                lastInterrupt = seconds;    
-            }    
-        }
-        */
-		draw_video_ram(state);
 	}
 	return 0;
 }
