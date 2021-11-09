@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/time.h>
+#include <stdbool.h>
 #include <time.h>
 
 #ifdef _WIN32
@@ -248,68 +249,74 @@ int main (int argc, char**argv)
 	ReadFileIntoMemoryAt(state, "./ROMs/invaders.e", 0x1800);
 
     uint32_t lastTime = SDL_GetTicks();
-	while (1)
-	{
+    bool quit = false;
+    SDL_Event ev;
+	while (!quit)
+    {
         unsigned char *op;
         int cycles = 0;
-        if (SDL_GetTicks() - lastTime >= FRAMERATE)
-        {
+        if (SDL_GetTicks() - lastTime >= FRAMERATE) {
             lastTime = SDL_GetTicks();
-            while (cycles < CYCLES_PER_FRAME / 2)
-            {
+            while (cycles < CYCLES_PER_FRAME / 2) {
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
                     state->a = HandleSpaceInvadersIN(op[1]);
                     state->pc += 2;
                     cycles += 3;
-                }
-                else if (*op == 0xd3) // machine OUT instruction
+                } else if (*op == 0xd3) // machine OUT instruction
                 {
                     HandleSpaceInvadersOUT(op[1], state->a);
-                    state->pc+=2;
-                    cycles+=3;
-                }
-                else
-                {   
+                    state->pc += 2;
+                    cycles += 3;
+                } else {
                     cycles += Emulate8080(state);
                 }
             }
 
-            if (state->int_enable)
-            {
+            if (state->int_enable) {
                 GenerateInterrupt(state, 1);
             }
 
-            HandleInput();
+            // HandleInput();
+
+            while (SDL_PollEvent(&ev)) {
+                if (ev.type == SDL_QUIT) {
+                    quit = true;
+                } else if (ev.type == SDL_KEYDOWN) {
+                    const char *key = SDL_GetKeyName(ev.key.keysym.sym);
+                    if(strcmp(key, "C") == 0) {
+                        quit = true;
+                    }
+                }
+            }
             DrawVideoRAM(state);
 
-            while (cycles < CYCLES_PER_FRAME)
-            {
+            while (cycles < CYCLES_PER_FRAME) {
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
                     state->a = HandleSpaceInvadersIN(op[1]);
                     state->pc += 2;
                     cycles += 3;
-                }
-                else if (*op == 0xd3) // machine OUT instruction
+                } else if (*op == 0xd3) // machine OUT instruction
                 {
                     HandleSpaceInvadersOUT(op[1], state->a);
-                    state->pc+=2;
-                    cycles+=3;
-                }
-                else
-                {   
+                    state->pc += 2;
+                    cycles += 3;
+                } else {
                     cycles += Emulate8080(state);
                 }
             }
 
-            if (state->int_enable) 
-            {
+            if (state->int_enable) {
                 GenerateInterrupt(state, 2);
             }
         }
 	}
+
+	SDL_FreeSurface(surface);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
 	return 0;
 }
