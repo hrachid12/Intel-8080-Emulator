@@ -81,17 +81,33 @@ void DrawVideoRAM(State8080* state) {
     }
 }
 
-uint8_t HandleSpaceInvadersIN(uint8_t port)
+uint8_t HandleSpaceInvadersIN(uint8_t port, uint8_t bit)
 {
     // returns value to be put into state->a
     unsigned char a = 0;
     switch(port)
     {
         case 0:
-                return 1;
-                break;
+                switch(bit) {
+                    case 4:
+                    {
+                        a = 0x10;
+                        break;
+                    }
+                }
         case 1: 
-                return 0;
+                switch(bit) {
+                    case 0:
+                    {
+                        a = 0x01;
+                        break;
+                    }
+                    case 2:
+                    {
+                        a = 0x04;
+                        break;
+                    }
+                }
                 break;
         case 3: // returns data shifted by the shift amount
             {
@@ -115,16 +131,33 @@ void HandleSpaceInvadersOUT(uint8_t port, uint8_t value)
     }
 }
 
-void HandleInput() {
+void HandleInput(bool *quit, State8080* state, int* cycles) {
     SDL_Event ev;
+
     while (SDL_PollEvent(&ev)) {
-        if (ev.type == SDL_QUIT){
-            exit(0);
+        if (ev.type == SDL_QUIT) {
+            *quit = true;
+        } else if (ev.type == SDL_KEYDOWN) {
+            const char *key = SDL_GetKeyName(ev.key.keysym.sym);
+            if (strcmp(key, "C") == 0) {
+                state->a |= HandleSpaceInvadersIN(1, 0);
+                state->pc += 2;
+                *cycles += 3;
+            } else if (strcmp(key, "1") == 0) {
+                state->a |= HandleSpaceInvadersIN(1, 2);
+                state->pc += 2;
+                *cycles += 3;
+            } else if (strcmp(key, "Z") == 0) {
+                *quit = true;
+            }
+        } else if (ev.type == SDL_MOUSEBUTTONDOWN) {
+            if (ev.button.button == SDL_BUTTON_LEFT) {
+                state->a |= HandleSpaceInvadersIN(0, 4);
+                state->pc += 2;
+                *cycles += 3;
+            }
         }
-        if (ev.type == SDL_KEYDOWN){
-            exit(0);
-        }
-    }  
+    }
 }
 
 State8080* Init8080(void)
@@ -250,7 +283,6 @@ int main (int argc, char**argv)
 
     uint32_t lastTime = SDL_GetTicks();
     bool quit = false;
-    SDL_Event ev;
 	while (!quit)
     {
         unsigned char *op;
@@ -261,7 +293,7 @@ int main (int argc, char**argv)
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
-                    state->a = HandleSpaceInvadersIN(op[1]);
+                    state->a = HandleSpaceInvadersIN(op[1], 0);
                     state->pc += 2;
                     cycles += 3;
                 } else if (*op == 0xd3) // machine OUT instruction
@@ -278,25 +310,14 @@ int main (int argc, char**argv)
                 GenerateInterrupt(state, 1);
             }
 
-            // HandleInput();
-
-            while (SDL_PollEvent(&ev)) {
-                if (ev.type == SDL_QUIT) {
-                    quit = true;
-                } else if (ev.type == SDL_KEYDOWN) {
-                    const char *key = SDL_GetKeyName(ev.key.keysym.sym);
-                    if(strcmp(key, "C") == 0) {
-                        quit = true;
-                    }
-                }
-            }
+            HandleInput(&quit, state, &cycles);
             DrawVideoRAM(state);
 
             while (cycles < CYCLES_PER_FRAME) {
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
-                    state->a = HandleSpaceInvadersIN(op[1]);
+                    state->a = HandleSpaceInvadersIN(op[1], 0);
                     state->pc += 2;
                     cycles += 3;
                 } else if (*op == 0xd3) // machine OUT instruction
