@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/time.h>
+#include <stdbool.h>
 #include <time.h>
 
 #ifdef _WIN32
@@ -21,6 +22,8 @@ int resizef;
 SDL_Window *window;
 SDL_Surface *winsurface;
 mem_t *ram;
+uint8_t input_port1 = 0;
+uint8_t input_port2 = 0;
 
 static uint16_t shift_register;
 uint8_t     shift_offset;   // offset for external shift hardware
@@ -87,11 +90,14 @@ uint8_t HandleSpaceInvadersIN(uint8_t port)
     switch(port)
     {
         case 0:
-                return 1;
+                a = 1;
                 break;
         case 1: 
-                return 0;
+                a = input_port1;
                 break;
+        case 2:
+            a = input_port2;
+            break;
         case 3: // returns data shifted by the shift amount
             {
                 a = shift_register >> (8 - shift_offset);;
@@ -114,16 +120,61 @@ void HandleSpaceInvadersOUT(uint8_t port, uint8_t value)
     }
 }
 
-void HandleInput() {
+void HandleInput(bool *quit, State8080* state) {
     SDL_Event ev;
+
     while (SDL_PollEvent(&ev)) {
-        if (ev.type == SDL_QUIT){
-            exit(0);
+        if (ev.type == SDL_QUIT) {
+            *quit = true;
+        } else if (ev.type == SDL_KEYDOWN) {
+            const char *key = SDL_GetKeyName(ev.key.keysym.sym);
+
+            if (strcmp(key, "C") == 0) {
+                input_port1 |= 0x01;
+            } else if (strcmp(key, "2") == 0) {
+                input_port1 |= 0x02;
+            } else if (strcmp(key, "1") == 0) {
+                input_port1 |= 0x04;
+            } else if (strcmp(key, "A") == 0) {
+                input_port1 |= 0x20;
+            } else if (strcmp(key, "D") == 0) {
+                input_port1 |= 0x40;
+            } else if (strcmp(key, "W") == 0) {
+                input_port1 |= 0x10;
+            } else if (strcmp(key, "Left") == 0) {
+                input_port2 |= 0x20;
+            } else if (strcmp(key, "Right") == 0) {
+                input_port2 |= 0x40;
+            } else if (strcmp(key, "Up") == 0) {
+                input_port2 |= 0x10;
+            } else if (strcmp(key, "Escape") == 0) {
+                *quit = true;
+            }
+        } else if (ev.type == SDL_KEYUP) {
+            const char *key = SDL_GetKeyName(ev.key.keysym.sym);
+            if (strcmp(key, "C") == 0) {
+                input_port1 &= ~0x01;
+            } else if (strcmp(key, "2") == 0) {
+                input_port1 &= ~0x02;
+            } else if (strcmp(key, "1") == 0) {
+                input_port1 &= ~0x04;
+            } else if (strcmp(key, "A") == 0) {
+                input_port1 &= ~0x20;
+            } else if (strcmp(key, "D") == 0) {
+                input_port1 &= ~0x40;
+            } else if (strcmp(key, "W") == 0) {
+                input_port1 &= ~0x10;
+            } else if (strcmp(key, "Left") == 0) {
+                input_port2 &= ~0x20;
+            } else if (strcmp(key, "Right") == 0) {
+                input_port2 &= ~0x40;
+            } else if (strcmp(key, "Up") == 0) {
+                input_port2 &= ~0x10;
+            } else if (strcmp(key, "Escape") == 0) {
+                *quit = true;
+            }
         }
-        if (ev.type == SDL_KEYDOWN){
-            exit(0);
-        }
-    }  
+    }
 }
 
 State8080* Init8080(void)
@@ -248,68 +299,61 @@ int main (int argc, char**argv)
 	ReadFileIntoMemoryAt(state, "./ROMs/invaders.e", 0x1800);
 
     uint32_t lastTime = SDL_GetTicks();
-	while (1)
-	{
+    bool quit = false;
+	while (!quit) {
         unsigned char *op;
         int cycles = 0;
-        if (SDL_GetTicks() - lastTime >= FRAMERATE)
-        {
+        if (SDL_GetTicks() - lastTime >= FRAMERATE) {
             lastTime = SDL_GetTicks();
-            while (cycles < CYCLES_PER_FRAME / 2)
-            {
+            while (cycles < CYCLES_PER_FRAME / 2) {
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
                     state->a = HandleSpaceInvadersIN(op[1]);
                     state->pc += 2;
                     cycles += 3;
-                }
-                else if (*op == 0xd3) // machine OUT instruction
+                } else if (*op == 0xd3) // machine OUT instruction
                 {
                     HandleSpaceInvadersOUT(op[1], state->a);
-                    state->pc+=2;
-                    cycles+=3;
-                }
-                else
-                {   
+                    state->pc += 2;
+                    cycles += 3;
+                } else {
                     cycles += Emulate8080(state);
                 }
             }
 
-            if (state->int_enable)
-            {
+            if (state->int_enable) {
                 GenerateInterrupt(state, 1);
             }
 
-            HandleInput();
+            HandleInput(&quit, state);
             DrawVideoRAM(state);
 
-            while (cycles < CYCLES_PER_FRAME)
-            {
+            while (cycles < CYCLES_PER_FRAME) {
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
                     state->a = HandleSpaceInvadersIN(op[1]);
                     state->pc += 2;
                     cycles += 3;
-                }
-                else if (*op == 0xd3) // machine OUT instruction
+                } else if (*op == 0xd3) // machine OUT instruction
                 {
                     HandleSpaceInvadersOUT(op[1], state->a);
-                    state->pc+=2;
-                    cycles+=3;
-                }
-                else
-                {   
+                    state->pc += 2;
+                    cycles += 3;
+                } else {
                     cycles += Emulate8080(state);
                 }
             }
 
-            if (state->int_enable) 
-            {
+            if (state->int_enable) {
                 GenerateInterrupt(state, 2);
             }
         }
 	}
+
+	SDL_FreeSurface(surface);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
 	return 0;
 }
