@@ -300,8 +300,7 @@ int main (int argc, char**argv)
 
     uint32_t lastTime = SDL_GetTicks();
     bool quit = false;
-	while (!quit)
-    {
+	while (!quit) {
         unsigned char *op;
         int cycles = 0;
         if (SDL_GetTicks() - lastTime >= FRAMERATE) {
