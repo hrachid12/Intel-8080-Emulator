@@ -22,6 +22,8 @@ int resizef;
 SDL_Window *window;
 SDL_Surface *winsurface;
 mem_t *ram;
+uint8_t input_port1 = 0;
+uint8_t input_port2 = 0;
 
 static uint16_t shift_register;
 uint8_t     shift_offset;   // offset for external shift hardware
@@ -81,34 +83,21 @@ void DrawVideoRAM(State8080* state) {
     }
 }
 
-uint8_t HandleSpaceInvadersIN(uint8_t port, uint8_t bit)
+uint8_t HandleSpaceInvadersIN(uint8_t port)
 {
     // returns value to be put into state->a
     unsigned char a = 0;
     switch(port)
     {
         case 0:
-                switch(bit) {
-                    case 4:
-                    {
-                        a = 0x10;
-                        break;
-                    }
-                }
-        case 1: 
-                switch(bit) {
-                    case 0:
-                    {
-                        a = 0x01;
-                        break;
-                    }
-                    case 2:
-                    {
-                        a = 0x04;
-                        break;
-                    }
-                }
+                a = 1;
                 break;
+        case 1: 
+                a = input_port1;
+                break;
+        case 2:
+            a = input_port2;
+            break;
         case 3: // returns data shifted by the shift amount
             {
                 a = shift_register >> (8 - shift_offset);;
@@ -131,7 +120,7 @@ void HandleSpaceInvadersOUT(uint8_t port, uint8_t value)
     }
 }
 
-void HandleInput(bool *quit, State8080* state, int* cycles) {
+void HandleInput(bool *quit, State8080* state) {
     SDL_Event ev;
 
     while (SDL_PollEvent(&ev)) {
@@ -139,22 +128,50 @@ void HandleInput(bool *quit, State8080* state, int* cycles) {
             *quit = true;
         } else if (ev.type == SDL_KEYDOWN) {
             const char *key = SDL_GetKeyName(ev.key.keysym.sym);
+
             if (strcmp(key, "C") == 0) {
-                state->a |= HandleSpaceInvadersIN(1, 0);
-                state->pc += 2;
-                *cycles += 3;
+                input_port1 |= 0x01;
+            } else if (strcmp(key, "2") == 0) {
+                input_port1 |= 0x02;
             } else if (strcmp(key, "1") == 0) {
-                state->a |= HandleSpaceInvadersIN(1, 2);
-                state->pc += 2;
-                *cycles += 3;
-            } else if (strcmp(key, "Z") == 0) {
+                input_port1 |= 0x04;
+            } else if (strcmp(key, "A") == 0) {
+                input_port1 |= 0x20;
+            } else if (strcmp(key, "D") == 0) {
+                input_port1 |= 0x40;
+            } else if (strcmp(key, "W") == 0) {
+                input_port1 |= 0x10;
+            } else if (strcmp(key, "Left") == 0) {
+                input_port2 |= 0x20;
+            } else if (strcmp(key, "Right") == 0) {
+                input_port2 |= 0x40;
+            } else if (strcmp(key, "Up") == 0) {
+                input_port2 |= 0x10;
+            } else if (strcmp(key, "Escape") == 0) {
                 *quit = true;
             }
-        } else if (ev.type == SDL_MOUSEBUTTONDOWN) {
-            if (ev.button.button == SDL_BUTTON_LEFT) {
-                state->a |= HandleSpaceInvadersIN(0, 4);
-                state->pc += 2;
-                *cycles += 3;
+        } else if (ev.type == SDL_KEYUP) {
+            const char *key = SDL_GetKeyName(ev.key.keysym.sym);
+            if (strcmp(key, "C") == 0) {
+                input_port1 &= ~0x01;
+            } else if (strcmp(key, "2") == 0) {
+                input_port1 &= ~0x02;
+            } else if (strcmp(key, "1") == 0) {
+                input_port1 &= ~0x04;
+            } else if (strcmp(key, "A") == 0) {
+                input_port1 &= ~0x20;
+            } else if (strcmp(key, "D") == 0) {
+                input_port1 &= ~0x40;
+            } else if (strcmp(key, "W") == 0) {
+                input_port1 &= ~0x10;
+            } else if (strcmp(key, "Left") == 0) {
+                input_port2 &= ~0x20;
+            } else if (strcmp(key, "Right") == 0) {
+                input_port2 &= ~0x40;
+            } else if (strcmp(key, "Up") == 0) {
+                input_port2 &= ~0x10;
+            } else if (strcmp(key, "Escape") == 0) {
+                *quit = true;
             }
         }
     }
@@ -293,7 +310,7 @@ int main (int argc, char**argv)
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
-                    state->a = HandleSpaceInvadersIN(op[1], 0);
+                    state->a = HandleSpaceInvadersIN(op[1]);
                     state->pc += 2;
                     cycles += 3;
                 } else if (*op == 0xd3) // machine OUT instruction
@@ -310,14 +327,14 @@ int main (int argc, char**argv)
                 GenerateInterrupt(state, 1);
             }
 
-            HandleInput(&quit, state, &cycles);
+            HandleInput(&quit, state);
             DrawVideoRAM(state);
 
             while (cycles < CYCLES_PER_FRAME) {
                 op = &state->memory[state->pc];
                 if (*op == 0xdb) // machine IN instruction
                 {
-                    state->a = HandleSpaceInvadersIN(op[1], 0);
+                    state->a = HandleSpaceInvadersIN(op[1]);
                     state->pc += 2;
                     cycles += 3;
                 } else if (*op == 0xd3) // machine OUT instruction

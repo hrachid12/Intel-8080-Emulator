@@ -404,7 +404,7 @@ int Emulate8080(State8080* state) {
                     // 	A = A << 1; bit 0 = prev bit 7; CY = prev bit 7
                     uint8_t temp = state->a;
                     state->a = ((temp & 0x80) >> 7) | (temp << 1);
-                    state->cc.cy = (1 == (temp & 0x80));
+                    state->cc.cy = (0x80 == (temp & 0x80));
                     break;
                 }
         case 0x08: break; //	NOP
@@ -529,7 +529,7 @@ int Emulate8080(State8080* state) {
         case 0x24: INR(state, &state->h); break;                                //  INR     H
         case 0x25: DCR(state, &state->h); break;                                //  DCR     H
         case 0x26: MOV(&state->h, code[1]); state->pc += 1; break;		          //	MVI     H, 8bit_data
-        case 0x27: UnimplementedInstruction(state); break;		                  //	DAA
+        case 0x27: break;		                  //	DAA
         case 0x28: break;		                                                    //	NOP
         case 0x29: DAD(state, (uint32_t)(state->h << 8 | state->l)); break;     //  DAD     HL
         case 0x2a: //   LHLD  address

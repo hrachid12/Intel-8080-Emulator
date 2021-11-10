@@ -31,12 +31,9 @@ int main (int argc, char**argv)
     int vblankcycles = 0;
     State8080* state = Init8080();
 
-    state->memory[0] = 0xeb;
+    state->memory[0] = 0x07;
 
-    state->h = 0x01;
-    state->l = 0x02;
-    state->d = 0x03;
-    state->e = 0x04;
+    state->a = 0xF2;
 
     PrintReg(state);
     done = Emulate8080(state);
