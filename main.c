@@ -9,8 +9,10 @@
 
 #ifdef _WIN32
     #include <SDL.h>
+    #include <SDL_mixer.h>
 #elif __APPLE__
     #include <SDL2/SDL.h>
+    #include <SDL2/SDL_mixer.h>
 #endif
 
 #include "./disassembler/disassembler.h"
@@ -24,6 +26,10 @@ SDL_Surface *winsurface;
 mem_t *ram;
 uint8_t input_port1 = 0;
 uint8_t input_port2 = 0;
+uint8_t output_port3 = 0;
+uint8_t output_port5 = 0;
+uint8_t last_output_port3 = 0;
+uint8_t last_output_port5 = 0;
 
 static uint16_t shift_register;
 uint8_t     shift_offset;   // offset for external shift hardware
@@ -34,6 +40,31 @@ uint8_t     shift_offset;   // offset for external shift hardware
 #define FRAMERATE         (1000.0 / 60.0)   // ms per frame
 #define CYCLES_PER_MS      2000             // 8080 runs at 2 Mhz
 #define CYCLES_PER_FRAME  (CYCLES_PER_MS * FRAMERATE)
+
+#define NUM_SAMPLES  9
+
+//The sound effects that will be used
+Mix_Chunk *wav0 = NULL;
+Mix_Chunk *wav1 = NULL;
+Mix_Chunk *wav2 = NULL;
+Mix_Chunk *wav3 = NULL;
+Mix_Chunk *wav4 = NULL;
+Mix_Chunk *wav5 = NULL;
+Mix_Chunk *wav6 = NULL;
+Mix_Chunk *wav7 = NULL;
+Mix_Chunk *wav8 = NULL;
+/*
+Mix_Chunk *wav9 = NULL;
+Mix_Chunk *wav10 = NULL;
+Mix_Chunk *wav11 = NULL;
+Mix_Chunk *wav12 = NULL;
+Mix_Chunk *wav13 = NULL;
+Mix_Chunk *wav14 = NULL;
+Mix_Chunk *wav15 = NULL;
+Mix_Chunk *wav16 = NULL;
+Mix_Chunk *wav17 = NULL;
+Mix_Chunk *wav18 = NULL;
+*/
 
 void ReadFileIntoMemoryAt(State8080* state, char* filename, uint32_t offset)
 {
@@ -114,8 +145,14 @@ void HandleSpaceInvadersOUT(uint8_t port, uint8_t value)
         case 2: // sets the shift amount
                 shift_offset = value;
                 break;
+        case 3: // sets output port for sound
+                output_port3 = value;
+                break;
         case 4: // sets the data in the shift registers
                 shift_register = (value << 8) | (shift_register >> 8);
+                break;
+        case 5: // sets output port for sound
+                output_port5 = value;
                 break;
     }
 }
@@ -183,8 +220,15 @@ State8080* Init8080(void)
 	state->memory = malloc(0x10000);  //16K
 
 	// SDL Init returns zero on success
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
         printf("Error initializing SDL: %s\n", SDL_GetError());
+        exit(1);
+    }
+
+    //Initialize SDL_mixer
+    if(Mix_OpenAudio( 44100, MIX_DEFAULT_FORMAT, 2, 2048 ) < 0)
+    {
+        printf( "SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError() );
         exit(1);
     }
 
@@ -289,6 +333,101 @@ int CompareEmulators(State8080* state, State8080* state2)
     return result;
 }
 
+void PlaySounds(void)
+{
+    if (output_port3 != last_output_port3)
+    {
+        int channel;
+        int ufoChannel = 1;
+        
+        if ( (output_port3 & 0x1) && !(last_output_port3 & 0x1) )
+        {
+            // Start UFO
+            wav0 = Mix_LoadWAV("./ROMs/sound/0.wav");
+            if(wav0 == NULL) { fprintf(stderr, "Unable to load WAV file 0: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel(ufoChannel, wav0, -1 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 0: %s\n", Mix_GetError()); }
+        }
+        else if ( !(output_port3 & 0x1) && (last_output_port3 & 0x1) ) 
+        {
+            // Stop UFO
+            Mix_HaltChannel(ufoChannel);
+        }
+
+        if ( (output_port3 & 0x2) && !(last_output_port3 & 0x2) )
+        {
+            // Player Shoot
+            wav1 = Mix_LoadWAV("./ROMs/sound/1.wav");
+            if(wav1 == NULL) { fprintf( stderr, "Unable to load WAV file 1: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav1, 0 );
+            if (channel == -1) { fprintf(stderr, "Unable to play WAV file 1: %s\n", Mix_GetError()); }
+        }           
+        
+        if ( (output_port3 & 0x4) && !(last_output_port3 & 0x4) )
+        {
+            wav2 = Mix_LoadWAV("./ROMs/sound/2.wav");
+            if(wav2 == NULL) { fprintf(stderr, "Unable to load WAV file 2: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav2, 0 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 2: %s\n", Mix_GetError()); }
+        }            
+        
+        if ( (output_port3 & 0x8) && !(last_output_port3 & 0x8) )
+        {
+            wav3 = Mix_LoadWAV("./ROMs/sound/3.wav");
+            if(wav3 == NULL) { fprintf(stderr, "Unable to load WAV file 3: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav3, 0 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 3: %s\n", Mix_GetError()); }
+        }            
+        
+        last_output_port3 = output_port3;
+    }
+    if (output_port5 != last_output_port5)
+    {
+        int channel;
+        if ( (output_port5 & 0x1) && !(last_output_port5 & 0x1))
+        {
+            wav4 = Mix_LoadWAV("./ROMs/sound/4.wav");
+            if(wav4 == NULL) { fprintf(stderr, "Unable to load WAV file 4: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav4, 0 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 4: %s\n", Mix_GetError()); }
+        }            
+        
+        if ( (output_port5 & 0x2) && !(last_output_port5 & 0x2))
+        {
+            wav5 = Mix_LoadWAV("./ROMs/sound/5.wav");
+            if(wav5 == NULL) { fprintf(stderr, "Unable to load WAV file 5: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav5, 0 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 5: %s\n", Mix_GetError()); }
+        }            
+        
+        if ( (output_port5 & 0x4) && !(last_output_port5 & 0x4))
+        {
+            wav6 = Mix_LoadWAV("./ROMs/sound/6.wav");
+            if(wav6 == NULL) { fprintf(stderr, "Unable to load WAV file 6: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav6, 0 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 6: %s\n", Mix_GetError()); }
+        }            
+        
+        if ( (output_port5 & 0x8) && !(last_output_port5 & 0x8))
+        {
+            wav7 = Mix_LoadWAV("./ROMs/sound/7.wav");
+            if(wav7 == NULL) { fprintf(stderr, "Unable to load WAV file 7: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav7, 0 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 7: %s\n", Mix_GetError()); }
+        }            
+        
+        if ( (output_port5 & 0x10) && !(last_output_port5 & 0x10))
+        {
+            wav8 = Mix_LoadWAV("./ROMs/sound/8.wav");
+            if(wav8 == NULL) { fprintf(stderr, "Unable to load WAV file 8: %s\n", Mix_GetError()); }
+            channel = Mix_PlayChannel( -1, wav8, 0 );
+            if(channel == -1) { fprintf(stderr, "Unable to play WAV file 8: %s\n", Mix_GetError()); }
+        }            
+        
+        last_output_port5 = output_port5;
+    }
+}
+
 int main (int argc, char**argv)
 {     
 	State8080* state = Init8080();
@@ -315,8 +454,9 @@ int main (int argc, char**argv)
                 } else if (*op == 0xd3) // machine OUT instruction
                 {
                     HandleSpaceInvadersOUT(op[1], state->a);
+                    PlaySounds();
                     state->pc += 2;
-                    cycles += 3;
+                    cycles += 3;                    
                 } else {
                     cycles += Emulate8080(state);
                 }
@@ -339,8 +479,9 @@ int main (int argc, char**argv)
                 } else if (*op == 0xd3) // machine OUT instruction
                 {
                     HandleSpaceInvadersOUT(op[1], state->a);
+                    PlaySounds();
                     state->pc += 2;
-                    cycles += 3;
+                    cycles += 3;                    
                 } else {
                     cycles += Emulate8080(state);
                 }
@@ -352,6 +493,16 @@ int main (int argc, char**argv)
         }
 	}
 
+    Mix_FreeChunk(wav0);
+    Mix_FreeChunk(wav1);
+    Mix_FreeChunk(wav2);
+    Mix_FreeChunk(wav3);
+    Mix_FreeChunk(wav4);
+    Mix_FreeChunk(wav5);
+    Mix_FreeChunk(wav6);
+    Mix_FreeChunk(wav7);
+    Mix_FreeChunk(wav8);
+    Mix_CloseAudio();
 	SDL_FreeSurface(surface);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
