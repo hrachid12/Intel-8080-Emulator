@@ -61,10 +61,10 @@ typedef struct {
 } mem_t;
 
 mem_t *mem_new(int size) {
-    mem_t *mem = malloc(sizeof(mem_t));
+    mem_t *mem = (mem_t*) malloc(sizeof(mem_t));
     mem->size = size;
 
-    mem->mem = malloc(sizeof(uint8_t) * size);
+    mem->mem = (uint8_t*) malloc(sizeof(uint8_t) * size);
 
     return mem;
 }
