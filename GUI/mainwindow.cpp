@@ -7,7 +7,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
-char file[100];
+char file[150];
 
 char* QString2charp (const QString &myString)
 {
@@ -41,6 +41,7 @@ void MainWindow::on_pushButton_browse_clicked()
     QString file_name = QFileDialog::getExistingDirectory(this, "Select a directory", "C://");
     ui->lineEdit_files->setText(file_name);
     memset(file, '\0', 100);
-    strcpy(file, QString2charp(file_name));
+    char* temp = QString2charp(file_name);
+    strncpy(file, temp, strlen(temp));
 }
 

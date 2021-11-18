@@ -423,7 +423,7 @@ void PlaySounds(void)
     }
 }
 
-int Play(char file_name[100])
+int Play(char file_name[150])
 {
     State8080* state = Init8080();
     int len = strlen(file_name);
