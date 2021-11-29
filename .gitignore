@@ -1,6 +1,8 @@
 .idea
 .idea/workspace.xml
 d_test
-main
-main.exe
 main_test
+build-GUI-Qt_6_2_1_for_macOS-Debug
+config
+test_files
+packages
