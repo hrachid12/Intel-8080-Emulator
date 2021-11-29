@@ -93,7 +93,19 @@ void DrawVideoRAM(State8080* state) {
                 int idx = (row - j) * WIDTH + col;
 
                 if (state->memory[i] & 1 << j) {
-                    pix[idx] = 0xFFFFFF;
+                    if (row >= 188 && row <= 240)
+                    {
+                        pix[idx] = 0x00FF00;            // color player ship and cover green
+                    }
+                    else if (row >= 33 && row <= 55)
+                    {
+                        pix[idx] = 0xFF0000;            // color ufo red
+                    }
+                    else                    
+                    {
+                        pix[idx] = 0xFFFFFF;            // color the rest simply white
+                    } 
+
                 } else {
                     pix[idx] = 0x000000;
                 }
@@ -166,25 +178,25 @@ void HandleInput(bool *quit, State8080* state) {
         } else if (ev.type == SDL_KEYDOWN) {
             const char *key = SDL_GetKeyName(ev.key.keysym.sym);
 
-            if (strcmp(key, "C") == 0) {
+            if (strcmp(key, "C") == 0) {            // Insert Credit
                 input_port1 |= 0x01;
-            } else if (strcmp(key, "2") == 0) {
+            } else if (strcmp(key, "2") == 0) {     // Player 2 Start
                 input_port1 |= 0x02;
-            } else if (strcmp(key, "1") == 0) {
+            } else if (strcmp(key, "1") == 0) {     // Player 1 Start
                 input_port1 |= 0x04;
-            } else if (strcmp(key, "A") == 0) {
+            } else if (strcmp(key, "A") == 0) {     // Player 1 move left
                 input_port1 |= 0x20;
-            } else if (strcmp(key, "D") == 0) {
+            } else if (strcmp(key, "D") == 0) {     // Player 1 move right
                 input_port1 |= 0x40;
-            } else if (strcmp(key, "W") == 0) {
+            } else if (strcmp(key, "W") == 0) {     // Player 1 shoot
                 input_port1 |= 0x10;
-            } else if (strcmp(key, "Left") == 0) {
+            } else if (strcmp(key, "Left") == 0) {  // Player 2 move left
                 input_port2 |= 0x20;
-            } else if (strcmp(key, "Right") == 0) {
+            } else if (strcmp(key, "Right") == 0) { // Player 2 move right
                 input_port2 |= 0x40;
-            } else if (strcmp(key, "Up") == 0) {
+            } else if (strcmp(key, "Up") == 0) {    // Player 2 shoot
                 input_port2 |= 0x10;
-            } else if (strcmp(key, "Escape") == 0) {
+            } else if (strcmp(key, "Escape") == 0) {// Quit
                 *quit = true;
             }
         } else if (ev.type == SDL_KEYUP) {
@@ -365,6 +377,7 @@ void PlaySounds(void)
         
         if ( (output_port3 & 0x4) && !(last_output_port3 & 0x4) )
         {
+            // Player dies
             wav2 = Mix_LoadWAV("./ROMs/sound/2.wav");
             if(wav2 == NULL) { fprintf(stderr, "Unable to load WAV file 2: %s\n", Mix_GetError()); }
             channel = Mix_PlayChannel( -1, wav2, 0 );
@@ -373,6 +386,7 @@ void PlaySounds(void)
         
         if ( (output_port3 & 0x8) && !(last_output_port3 & 0x8) )
         {
+            // Invader dies
             wav3 = Mix_LoadWAV("./ROMs/sound/3.wav");
             if(wav3 == NULL) { fprintf(stderr, "Unable to load WAV file 3: %s\n", Mix_GetError()); }
             channel = Mix_PlayChannel( -1, wav3, 0 );
@@ -386,6 +400,7 @@ void PlaySounds(void)
         int channel;
         if ( (output_port5 & 0x1) && !(last_output_port5 & 0x1))
         {
+            // Fleet movement 1
             wav4 = Mix_LoadWAV("./ROMs/sound/4.wav");
             if(wav4 == NULL) { fprintf(stderr, "Unable to load WAV file 4: %s\n", Mix_GetError()); }
             channel = Mix_PlayChannel( -1, wav4, 0 );
@@ -394,6 +409,7 @@ void PlaySounds(void)
         
         if ( (output_port5 & 0x2) && !(last_output_port5 & 0x2))
         {
+            // Fleet movement 2
             wav5 = Mix_LoadWAV("./ROMs/sound/5.wav");
             if(wav5 == NULL) { fprintf(stderr, "Unable to load WAV file 5: %s\n", Mix_GetError()); }
             channel = Mix_PlayChannel( -1, wav5, 0 );
@@ -402,6 +418,7 @@ void PlaySounds(void)
         
         if ( (output_port5 & 0x4) && !(last_output_port5 & 0x4))
         {
+            // Fleet movement 3
             wav6 = Mix_LoadWAV("./ROMs/sound/6.wav");
             if(wav6 == NULL) { fprintf(stderr, "Unable to load WAV file 6: %s\n", Mix_GetError()); }
             channel = Mix_PlayChannel( -1, wav6, 0 );
@@ -410,6 +427,7 @@ void PlaySounds(void)
         
         if ( (output_port5 & 0x8) && !(last_output_port5 & 0x8))
         {
+            // Fleet movement 4
             wav7 = Mix_LoadWAV("./ROMs/sound/7.wav");
             if(wav7 == NULL) { fprintf(stderr, "Unable to load WAV file 7: %s\n", Mix_GetError()); }
             channel = Mix_PlayChannel( -1, wav7, 0 );
@@ -418,6 +436,7 @@ void PlaySounds(void)
         
         if ( (output_port5 & 0x10) && !(last_output_port5 & 0x10))
         {
+            // UFO hit
             wav8 = Mix_LoadWAV("./ROMs/sound/8.wav");
             if(wav8 == NULL) { fprintf(stderr, "Unable to load WAV file 8: %s\n", Mix_GetError()); }
             channel = Mix_PlayChannel( -1, wav8, 0 );
