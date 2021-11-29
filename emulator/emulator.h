@@ -529,7 +529,25 @@ int Emulate8080(State8080* state) {
         case 0x24: INR(state, &state->h); break;                                //  INR     H
         case 0x25: DCR(state, &state->h); break;                                //  DCR     H
         case 0x26: MOV(&state->h, code[1]); state->pc += 1; break;		          //	MVI     H, 8bit_data
-        case 0x27: break;		                  //	DAA
+        case 0x27: // DAA
+                  // only partial implementation sufficient to do hex->decimal conversion
+                  {
+                    if((state->a & 0x0f) > 0x09)
+                    {
+                      state->a += 0x06;
+                    }
+                    if((state->a & 0xf0) > 0x90)
+                    {
+                      uint16_t result = state->a + 0x60;
+                      if (result > 0xff)
+                      {
+                        state->cc.cy = 1;
+                      }
+                      HandleZSP_Flags(state, result);
+                      state->a = (uint8_t)result;
+                    }
+                  }
+                  break;
         case 0x28: break;		                                                    //	NOP
         case 0x29: DAD(state, (uint32_t)(state->h << 8 | state->l)); break;     //  DAD     HL
         case 0x2a: //   LHLD  address
